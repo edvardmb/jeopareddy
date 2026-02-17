@@ -1,0 +1,8 @@
+# .NET build artifacts
+**/bin/
+**/obj/
+
+# Local database files
+backend/*.db
+backend/*.db-shm
+backend/*.db-wal

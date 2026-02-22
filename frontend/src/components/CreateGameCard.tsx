@@ -9,7 +9,7 @@ export default function CreateGameCard(props: CreateGameCardProps) {
   const { gameTitle, isBusy, onGameTitleChange, onCreate } = props
 
   return (
-    <section className="card">
+    <section className="card card-blue">
       <h2>1. Create A New Game</h2>
       <p className="muted">Start from scratch with a fresh game board.</p>
       <div className="row">
@@ -22,7 +22,7 @@ export default function CreateGameCard(props: CreateGameCardProps) {
             placeholder="Example: Friday Trivia Night"
           />
         </div>
-        <button disabled={isBusy} onClick={onCreate}>
+        <button className="btn-primary" disabled={isBusy} onClick={onCreate}>
           Create Game
         </button>
       </div>

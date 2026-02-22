@@ -22,7 +22,7 @@ export default function LoadGameCard(props: LoadGameCardProps) {
   }, [games, selectedGameId])
 
   return (
-    <section className="card">
+    <section className="card card-sky">
       <h2>2. Load Existing Game</h2>
       <p className="muted">Paste a game ID to continue editing or hosting.</p>
       <div className="row">
@@ -30,10 +30,10 @@ export default function LoadGameCard(props: LoadGameCardProps) {
           <label htmlFor="load-game-id">Game ID</label>
           <input id="load-game-id" value={gameIdInput} onChange={(event) => onGameIdChange(event.target.value)} placeholder="Game ID" />
         </div>
-        <button disabled={isBusy || !gameIdInput} onClick={onLoad}>
+        <button className="btn-primary" disabled={isBusy || !gameIdInput} onClick={onLoad}>
           Load Game
         </button>
-        <button disabled={isBusy} onClick={onRefresh}>
+        <button className="btn-secondary" disabled={isBusy} onClick={onRefresh}>
           Refresh List
         </button>
       </div>
@@ -54,7 +54,7 @@ export default function LoadGameCard(props: LoadGameCardProps) {
             </select>
             <div className="tiny muted">Choose a game and click load.</div>
           </div>
-          <button disabled={isBusy || !selectedGameId} onClick={() => onLoadFromList(selectedGameId)}>
+          <button className="btn-primary" disabled={isBusy || !selectedGameId} onClick={() => onLoadFromList(selectedGameId)}>
             Load Selected
           </button>
         </div>

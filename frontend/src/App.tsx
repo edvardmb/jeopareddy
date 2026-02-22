@@ -28,6 +28,7 @@ import LoadGameCard from './components/LoadGameCard'
 import PlayModeView from './components/PlayModeView'
 import ScoreEventCard from './components/ScoreEventCard'
 import TeamsCard from './components/TeamsCard'
+import InfoHint from './components/InfoHint'
 import './App.css'
 
 function App() {
@@ -45,6 +46,9 @@ function App() {
   const [message, setMessage] = useState('')
   const [messageTone, setMessageTone] = useState<'success' | 'error' | ''>('')
   const [activeSection, setActiveSection] = useState<'dashboard' | 'host' | 'play' | 'preview' | 'preview-neon'>('dashboard')
+  const [jokerEnabled, setJokerEnabled] = useState(false)
+  const [jokerAppearancesPerGame, setJokerAppearancesPerGame] = useState(1)
+  const [jokerAssignedClueIds, setJokerAssignedClueIds] = useState<string[]>([])
 
   const canOperateOnGame = Boolean(loadedGame?.id)
   const isSetupLocked = loadedGame?.status === 'InProgress'
@@ -86,11 +90,84 @@ function App() {
     })
   }, [])
 
+  useEffect(() => {
+    setJokerAssignedClueIds([])
+  }, [loadedGame?.id])
+
+  useEffect(() => {
+    if (!loadedGame)
+    {
+      if (jokerAssignedClueIds.length > 0) {
+        setJokerAssignedClueIds([])
+      }
+      return
+    }
+
+    if (!jokerEnabled) {
+      if (jokerAssignedClueIds.length > 0) {
+        setJokerAssignedClueIds([])
+      }
+      return
+    }
+
+    const allClues = loadedGame.categories.flatMap((category) => category.clues)
+    const targetCount = Math.max(0, Math.min(Math.floor(jokerAppearancesPerGame || 0), allClues.length))
+    if (targetCount === 0) {
+      if (jokerAssignedClueIds.length > 0) {
+        setJokerAssignedClueIds([])
+      }
+      return
+    }
+
+    const allClueIdSet = new Set(allClues.map((clue) => clue.id))
+    const answeredClueIdSet = new Set(allClues.filter((clue) => clue.isAnswered).map((clue) => clue.id))
+    const existingValid = jokerAssignedClueIds.filter((id) => allClueIdSet.has(id))
+    const completedAssignments = existingValid.filter((id) => answeredClueIdSet.has(id))
+    const pendingAssignments = existingValid.filter((id) => !answeredClueIdSet.has(id))
+
+    const nextAssignments: string[] = []
+    nextAssignments.push(...completedAssignments.slice(0, targetCount))
+
+    if (nextAssignments.length < targetCount) {
+      nextAssignments.push(...pendingAssignments.slice(0, targetCount - nextAssignments.length))
+    }
+
+    const chosenSet = new Set(nextAssignments)
+    if (nextAssignments.length < targetCount) {
+      const availableUnanswered = allClues
+        .filter((clue) => !clue.isAnswered && !chosenSet.has(clue.id))
+        .map((clue) => clue.id)
+
+      nextAssignments.push(...shuffle(availableUnanswered).slice(0, targetCount - nextAssignments.length))
+    }
+
+    if (!sameStringSet(jokerAssignedClueIds, nextAssignments)) {
+      setJokerAssignedClueIds(nextAssignments)
+    }
+  }, [jokerAssignedClueIds, jokerAppearancesPerGame, jokerEnabled, loadedGame])
+
+  const jokerStats = useMemo(() => {
+    if (!loadedGame) {
+      return { totalAssigned: 0, completed: 0, remaining: 0 }
+    }
+
+    const answeredClueIds = new Set(
+      loadedGame.categories.flatMap((category) => category.clues.filter((clue) => clue.isAnswered).map((clue) => clue.id)),
+    )
+    const completed = jokerAssignedClueIds.filter((id) => answeredClueIds.has(id)).length
+    const totalAssigned = jokerAssignedClueIds.length
+    return {
+      totalAssigned,
+      completed,
+      remaining: Math.max(0, totalAssigned - completed),
+    }
+  }, [jokerAssignedClueIds, loadedGame])
+
   return (
     <main className="page">
       <header className="app-header">
         <div>
-          <h1>Jeopareddy</h1>
+          <h1>JeoparEddy</h1>
           <p className="muted">Build, host, and play your game in one flow.</p>
         </div>
         <div className="session-chip-wrap">
@@ -99,7 +176,7 @@ function App() {
               <>
                 <strong>{loadedGame.title}</strong>
                 <span className="tiny muted">
-                  {loadedGame.status} • {loadedGame.id}
+                  {loadedGame.status}
                 </span>
               </>
             ) : (
@@ -219,6 +296,7 @@ function App() {
               onReset={() =>
                 withBusy(async () => {
                   await resetGame(loadedGame.id)
+                  setJokerAssignedClueIds([])
                   await loadGame(loadedGame.id)
                   setMessage('Game reset to Draft with cleared scores and clues')
                   setMessageTone('success')
@@ -260,7 +338,42 @@ function App() {
               }
             />
 
-            
+            <section className={`card card-sky ${isSetupLocked ? 'card-disabled' : ''}`}>
+              <h2>Joker Mini-Game</h2>
+              <p className="muted">Randomly replace some clue reveals with the Joker ladder mini-game.</p>
+              <div className="grid">
+                <div className="field">
+                  <label>Include Joker In Game</label>
+                  <button
+                    type="button"
+                    className={jokerEnabled ? 'btn-success' : 'btn-secondary'}
+                    disabled={isBusy || !loadedGame || isSetupLocked}
+                    onClick={() => setJokerEnabled((value) => !value)}
+                  >
+                    {jokerEnabled ? 'Enabled' : 'Disabled'}
+                  </button>
+                </div>
+                <div className="field">
+                  <div className="field-label-row">
+                    <label htmlFor="joker-appearances">Appearances Per Game</label>
+                    <InfoHint text="How many clues will trigger Joker before the question appears." label="Joker appearances help" />
+                  </div>
+                  <input
+                    id="joker-appearances"
+                    type="number"
+                    min={0}
+                    max={25}
+                    disabled={isBusy || !loadedGame || isSetupLocked}
+                    value={jokerAppearancesPerGame}
+                    onChange={(event) => setJokerAppearancesPerGame(Math.max(0, Number(event.target.value) || 0))}
+                  />
+                </div>
+              </div>
+              <p className="tiny muted">
+                Assigned this game: {jokerStats.totalAssigned} • Triggered: {jokerStats.completed} • Remaining: {jokerStats.remaining}
+              </p>
+              <p className="tiny muted">These settings are local to the current host session (not saved in the backend yet).</p>
+            </section>
           </div>
 
           <div>
@@ -350,17 +463,21 @@ function App() {
         <PlayModeView
           game={loadedGame}
           isBusy={isBusy}
-          onResolveQuestion={({ clue, teamId, isCorrect }) =>
+          jokerConfig={{
+            enabled: jokerEnabled,
+            assignedClueIds: jokerAssignedClueIds,
+          }}
+          onResolveQuestion={({ clue, teamId, isCorrect, resolvedPointValue }) =>
             withBusy(async () => {
               await createScoreEvent(loadedGame.id, {
                 teamId,
                 clueId: clue.id,
-                deltaPoints: isCorrect ? clue.pointValue : -clue.pointValue,
+                deltaPoints: isCorrect ? resolvedPointValue : -resolvedPointValue,
                 reason: isCorrect ? 'Correct answer' : 'Incorrect answer',
               })
               await updateClue(loadedGame.id, clue.id, { isRevealed: true, isAnswered: true })
               await loadGame(loadedGame.id)
-              setMessage(isCorrect ? 'Point awarded.' : 'Points deducted.')
+              setMessage(isCorrect ? `Point awarded: ${resolvedPointValue}` : `Points deducted: ${resolvedPointValue}`)
               setMessageTone(isCorrect ? 'success' : 'error')
             })
           }
@@ -371,3 +488,26 @@ function App() {
 }
 
 export default App
+
+function shuffle<T>(values: T[]): T[] {
+  const next = [...values]
+  for (let i = next.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1))
+    const current = next[i]
+    next[i] = next[j]
+    next[j] = current
+  }
+
+  return next
+}
+
+function sameStringSet(left: string[], right: string[]): boolean {
+  if (left.length !== right.length) {
+    return false
+  }
+
+  const rightSet = new Set(right)
+  return left.every((item) => rightSet.has(item))
+}
+
+

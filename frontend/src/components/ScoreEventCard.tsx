@@ -1,4 +1,5 @@
 import { Team } from '../api'
+import InfoHint from './InfoHint'
 
 type ScoreEventCardProps = {
   teams: Team[]
@@ -44,7 +45,10 @@ export default function ScoreEventCard(props: ScoreEventCardProps) {
           </select>
         </div>
         <div className="field">
-          <label htmlFor="score-delta">Points Change</label>
+          <div className="field-label-row">
+            <label htmlFor="score-delta">Points Change</label>
+            <InfoHint text="Use negative values to subtract points." label="Points change help" />
+          </div>
           <input
             id="score-delta"
             value={scoreDelta}
@@ -52,7 +56,6 @@ export default function ScoreEventCard(props: ScoreEventCardProps) {
             onChange={(event) => onScoreDeltaChange(Number(event.target.value))}
             placeholder="+100 or -100"
           />
-          <div className="tiny muted">Use negative values to subtract points.</div>
         </div>
         <div className="field">
           <label htmlFor="score-reason">Reason</label>

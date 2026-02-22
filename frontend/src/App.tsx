@@ -1,10 +1,29 @@
 import { useEffect, useMemo, useState } from 'react'
-import { API_BASE_URL, addCategory, addTeam, createGame, createScoreEvent, Game, GameListItem, getGame, listGames, resetGame, startGame, updateClue } from './api'
+import {
+  API_BASE_URL,
+  addCategory,
+  addTeam,
+  createGame,
+  createScoreEvent,
+  deleteCategory,
+  deleteClue,
+  Game,
+  GameListItem,
+  getGame,
+  listGames,
+  resetGame,
+  startGame,
+  updateCategory,
+  updateClue,
+  updateClueContent,
+} from './api'
 import AddCategoryCard from './components/AddCategoryCard'
 import AddTeamCard from './components/AddTeamCard'
 import BoardCard from './components/BoardCard'
 import CreateGameCard from './components/CreateGameCard'
 import CurrentGameCard from './components/CurrentGameCard'
+import DesignPreview from './components/DesignPreview'
+import DesignPreviewNeon from './components/DesignPreviewNeon'
 import LoadGameCard from './components/LoadGameCard'
 import PlayModeView from './components/PlayModeView'
 import ScoreEventCard from './components/ScoreEventCard'
@@ -25,9 +44,10 @@ function App() {
   const [isBusy, setIsBusy] = useState(false)
   const [message, setMessage] = useState('')
   const [messageTone, setMessageTone] = useState<'success' | 'error' | ''>('')
-  const [activeSection, setActiveSection] = useState<'dashboard' | 'host' | 'play'>('dashboard')
+  const [activeSection, setActiveSection] = useState<'dashboard' | 'host' | 'play' | 'preview' | 'preview-neon'>('dashboard')
 
   const canOperateOnGame = Boolean(loadedGame?.id)
+  const isSetupLocked = loadedGame?.status === 'InProgress'
   const scoreTeams = useMemo(() => loadedGame?.teams ?? [], [loadedGame])
 
   const loadGame = async (gameId: string) => {
@@ -94,6 +114,15 @@ function App() {
         <button className={activeSection === 'dashboard' ? 'tab-btn active' : 'tab-btn'} onClick={() => setActiveSection('dashboard')}>
           Dashboard
         </button>
+        <button className={activeSection === 'preview' ? 'tab-btn active' : 'tab-btn'} onClick={() => setActiveSection('preview')}>
+          Design Preview
+        </button>
+        <button
+          className={activeSection === 'preview-neon' ? 'tab-btn active' : 'tab-btn'}
+          onClick={() => setActiveSection('preview-neon')}
+        >
+          Neon Preview
+        </button>
         <button
           className={activeSection === 'host' ? 'tab-btn active' : 'tab-btn'}
           disabled={!loadedGame}
@@ -110,6 +139,9 @@ function App() {
         </button>
       </nav>
       {message && <p className={`message ${messageTone}`}>{message}</p>}
+
+      {activeSection === 'preview' && <DesignPreview />}
+      {activeSection === 'preview-neon' && <DesignPreviewNeon />}
 
       {activeSection === 'dashboard' && (
         <>
@@ -198,6 +230,7 @@ function App() {
               teamName={teamName}
               isBusy={isBusy}
               canOperateOnGame={canOperateOnGame}
+              isLocked={isSetupLocked}
               onTeamNameChange={setTeamName}
               onAddTeam={() =>
                 withBusy(async () => {
@@ -214,6 +247,7 @@ function App() {
               categoryOrder={categoryOrder}
               isBusy={isBusy}
               canOperateOnGame={canOperateOnGame}
+              isLocked={isSetupLocked}
               onCategoryNameChange={setCategoryName}
               onCategoryOrderChange={setCategoryOrder}
               onAddCategory={(payload) =>
@@ -226,6 +260,11 @@ function App() {
               }
             />
 
+            
+          </div>
+
+          <div>
+            <TeamsCard teams={loadedGame.teams} />
             <ScoreEventCard
               teams={scoreTeams}
               scoreTeamId={scoreTeamId}
@@ -250,14 +289,42 @@ function App() {
                 })
               }
             />
-          </div>
-
-          <div>
-            <TeamsCard teams={loadedGame.teams} />
-
             <BoardCard
               categories={loadedGame.categories}
+              isDraft={loadedGame.status === 'Draft'}
               isBusy={isBusy}
+              onEditCategory={(categoryId, payload) =>
+                withBusy(async () => {
+                  await updateCategory(loadedGame.id, categoryId, payload)
+                  await loadGame(loadedGame.id)
+                  setMessage('Category updated')
+                  setMessageTone('success')
+                })
+              }
+              onDeleteCategory={(categoryId) =>
+                withBusy(async () => {
+                  await deleteCategory(loadedGame.id, categoryId)
+                  await loadGame(loadedGame.id)
+                  setMessage('Category removed')
+                  setMessageTone('success')
+                })
+              }
+              onEditClue={(clueId, payload) =>
+                withBusy(async () => {
+                  await updateClueContent(loadedGame.id, clueId, payload)
+                  await loadGame(loadedGame.id)
+                  setMessage('Question updated')
+                  setMessageTone('success')
+                })
+              }
+              onDeleteClue={(clueId) =>
+                withBusy(async () => {
+                  await deleteClue(loadedGame.id, clueId)
+                  await loadGame(loadedGame.id)
+                  setMessage('Question removed')
+                  setMessageTone('success')
+                })
+              }
               onToggleReveal={(clueId, currentValue) =>
                 withBusy(async () => {
                   await updateClue(loadedGame.id, clueId, { isRevealed: !currentValue })

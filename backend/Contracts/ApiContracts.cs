@@ -2,10 +2,24 @@ namespace Jeopareddy.Api.Contracts;
 
 public sealed record CreateGameRequest(string Title);
 public sealed record CreateCategoryRequest(string Name, int DisplayOrder, IReadOnlyList<CreateClueRequest> Clues);
-public sealed record CreateClueRequest(string Prompt, string Answer, int PointValue, int RowOrder);
+public sealed record CreateClueRequest(
+    string Prompt,
+    string Answer,
+    int PointValue,
+    int RowOrder,
+    string? ImageMimeType,
+    string? ImageBase64);
 public sealed record CreateTeamRequest(string Name, int? DisplayOrder);
 public sealed record CreateScoreEventRequest(Guid TeamId, Guid? ClueId, int DeltaPoints, string? Reason);
 public sealed record UpdateClueRequest(bool? IsRevealed, bool? IsAnswered);
+public sealed record UpdateCategoryRequest(string Name, int DisplayOrder);
+public sealed record UpdateClueContentRequest(
+    string Prompt,
+    string Answer,
+    int PointValue,
+    int RowOrder,
+    string? ImageMimeType,
+    string? ImageBase64);
 
 public sealed record GameListItemResponse(
     Guid Id,
@@ -33,6 +47,8 @@ public sealed record ClueResponse(
     Guid Id,
     string Prompt,
     string Answer,
+    string? ImageMimeType,
+    string? ImageBase64,
     int PointValue,
     int RowOrder,
     bool IsRevealed,

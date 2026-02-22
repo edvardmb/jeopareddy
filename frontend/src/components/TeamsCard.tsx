@@ -9,15 +9,17 @@ export default function TeamsCard(props: TeamsCardProps) {
   const rankedTeams = [...teams].sort((a, b) => b.score - a.score || a.displayOrder - b.displayOrder)
 
   return (
-    <section className="card">
+    <section className="card card-scoreboard">
       <h2>Live Scoreboard</h2>
       {rankedTeams.length === 0 ? (
         <p className="muted">No teams yet</p>
       ) : (
-        <ul className="list">
-          {rankedTeams.map((team) => (
-            <li key={team.id}>
-              <strong>{team.name}</strong> - {team.score} pts
+        <ul className="list scoreboard-list">
+          {rankedTeams.map((team, index) => (
+            <li key={team.id} className="scoreboard-item">
+              <span className="scoreboard-rank">{index + 1}</span>
+              <strong>{team.name}</strong>
+              <span className="scoreboard-points">{team.score} pts</span>
             </li>
           ))}
         </ul>

@@ -2,6 +2,8 @@ export type Clue = {
   id: string
   prompt: string
   answer: string
+  imageMimeType: string | null
+  imageBase64: string | null
   pointValue: number
   rowOrder: number
   isRevealed: boolean
@@ -122,13 +124,38 @@ export function addCategory(
   payload: {
     name: string
     displayOrder: number
-    clues: { prompt: string; answer: string; pointValue: number; rowOrder: number }[]
+    clues: {
+      prompt: string
+      answer: string
+      pointValue: number
+      rowOrder: number
+      imageMimeType?: string | null
+      imageBase64?: string | null
+    }[]
   },
 ): Promise<void> {
   return requestNoBody(`/api/games/${gameId}/categories`, {
     method: 'POST',
     headers: jsonHeaders,
     body: JSON.stringify(payload),
+  })
+}
+
+export function updateCategory(
+  gameId: string,
+  categoryId: string,
+  payload: { name: string; displayOrder: number },
+): Promise<void> {
+  return requestNoBody(`/api/games/${gameId}/categories/${categoryId}`, {
+    method: 'PATCH',
+    headers: jsonHeaders,
+    body: JSON.stringify(payload),
+  })
+}
+
+export function deleteCategory(gameId: string, categoryId: string): Promise<void> {
+  return requestNoBody(`/api/games/${gameId}/categories/${categoryId}`, {
+    method: 'DELETE',
   })
 }
 
@@ -152,5 +179,30 @@ export function updateClue(
     method: 'PATCH',
     headers: jsonHeaders,
     body: JSON.stringify(payload),
+  })
+}
+
+export function updateClueContent(
+  gameId: string,
+  clueId: string,
+  payload: {
+    prompt: string
+    answer: string
+    pointValue: number
+    rowOrder: number
+    imageMimeType?: string | null
+    imageBase64?: string | null
+  },
+): Promise<void> {
+  return requestNoBody(`/api/games/${gameId}/clues/${clueId}/content`, {
+    method: 'PATCH',
+    headers: jsonHeaders,
+    body: JSON.stringify(payload),
+  })
+}
+
+export function deleteClue(gameId: string, clueId: string): Promise<void> {
+  return requestNoBody(`/api/games/${gameId}/clues/${clueId}`, {
+    method: 'DELETE',
   })
 }

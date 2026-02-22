@@ -51,7 +51,7 @@ export default function PlayModeView(props: PlayModeViewProps) {
 
   if (game.categories.length === 0) {
     return (
-      <section className="card">
+      <section className="card card-play">
         <h2>Play Mode</h2>
         <p className="muted">Add categories and questions first.</p>
       </section>
@@ -59,7 +59,7 @@ export default function PlayModeView(props: PlayModeViewProps) {
   }
 
   return (
-    <section className="card">
+    <section className="card card-play">
       <h2>Play Mode</h2>
       <p className="muted">Select a card, read the question, submit an answer, and score automatically.</p>
       {currentTeam && (
@@ -106,8 +106,13 @@ export default function PlayModeView(props: PlayModeViewProps) {
 
       {activeClue && (
         <div className="modal-backdrop">
-          <div className="modal-card">
-            <h3>Question for {activeClue.pointValue} points</h3>
+          <div className="modal-card" role="dialog" aria-modal="true" aria-labelledby="play-modal-title">
+            <h3 id="play-modal-title">Question for {activeClue.pointValue} points</h3>
+            {getClueImageSrc(activeClue) && (
+              <div className="play-clue-image-wrap">
+                <img className="play-clue-image" src={getClueImageSrc(activeClue)!} alt="Question visual" />
+              </div>
+            )}
             <p>{activeClue.prompt}</p>
 
             <p>
@@ -126,6 +131,7 @@ export default function PlayModeView(props: PlayModeViewProps) {
 
             <div className="row">
               <button
+                className="btn-success"
                 disabled={isBusy || !currentTeamId || !answerInput.trim() || hasSubmitted}
                 onClick={async () => {
                   const isCorrect = normalize(answerInput) === normalize(activeClue.answer)
@@ -143,6 +149,7 @@ export default function PlayModeView(props: PlayModeViewProps) {
                 Submit Answer
               </button>
               <button
+                className="btn-secondary"
                 type="button"
                 onClick={() => {
                   setActiveClue(null)
@@ -155,7 +162,11 @@ export default function PlayModeView(props: PlayModeViewProps) {
               </button>
             </div>
 
-            {feedback && <p className={`message ${feedback.startsWith('Correct') ? 'success' : 'error'}`}>{feedback}</p>}
+            {feedback && (
+              <p className={`message ${feedback.startsWith('Correct') ? 'success' : 'error'}`} aria-live="polite">
+                {feedback}
+              </p>
+            )}
           </div>
         </div>
       )}
@@ -186,4 +197,12 @@ function normalize(value: string): string {
     .replace(/\b(a|an|the)\b/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
+}
+
+function getClueImageSrc(clue: Clue): string | null {
+  if (!clue.imageMimeType || !clue.imageBase64) {
+    return null
+  }
+
+  return `data:${clue.imageMimeType};base64,${clue.imageBase64}`
 }

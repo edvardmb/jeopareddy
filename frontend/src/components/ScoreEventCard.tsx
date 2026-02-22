@@ -28,7 +28,7 @@ export default function ScoreEventCard(props: ScoreEventCardProps) {
   } = props
 
   return (
-    <section className="card">
+    <section className="card card-orange">
       <h2>Manual Scoring</h2>
       <p className="muted">Apply positive or negative point adjustments.</p>
       <div className="grid">
@@ -58,7 +58,7 @@ export default function ScoreEventCard(props: ScoreEventCardProps) {
           <label htmlFor="score-reason">Reason</label>
           <input id="score-reason" value={scoreReason} onChange={(event) => onScoreReasonChange(event.target.value)} placeholder="Reason" />
         </div>
-        <button disabled={isBusy || !canOperateOnGame || !scoreTeamId} onClick={onApplyScore}>
+        <button className="btn-warning" disabled={isBusy || !canOperateOnGame || !scoreTeamId} onClick={onApplyScore}>
           Apply Points
         </button>
       </div>

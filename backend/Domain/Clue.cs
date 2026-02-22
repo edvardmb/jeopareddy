@@ -7,6 +7,8 @@ public sealed class Clue
     public Guid CategoryId { get; set; }
     public string Prompt { get; set; } = string.Empty;
     public string Answer { get; set; } = string.Empty;
+    public string? ImageMimeType { get; set; }
+    public string? ImageBase64 { get; set; }
     public int PointValue { get; set; }
     public int RowOrder { get; set; }
     public bool IsRevealed { get; set; }

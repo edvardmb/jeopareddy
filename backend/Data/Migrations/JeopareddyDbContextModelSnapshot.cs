@@ -57,6 +57,12 @@ namespace Jeopareddy.Api.Data.Migrations
                     b.Property<Guid>("GameId")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ImageBase64")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ImageMimeType")
+                        .HasColumnType("TEXT");
+
                     b.Property<bool>("IsAnswered")
                         .HasColumnType("INTEGER");
 

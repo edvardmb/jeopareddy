@@ -40,6 +40,8 @@ public sealed class JeopareddyDbContext(DbContextOptions<JeopareddyDbContext> op
             entity.HasKey(x => x.Id);
             entity.Property(x => x.Prompt).IsRequired();
             entity.Property(x => x.Answer).IsRequired();
+            entity.Property(x => x.ImageMimeType);
+            entity.Property(x => x.ImageBase64);
             entity.Property(x => x.PointValue).IsRequired();
             entity.Property(x => x.RowOrder).IsRequired();
             entity.Property(x => x.IsRevealed).IsRequired();

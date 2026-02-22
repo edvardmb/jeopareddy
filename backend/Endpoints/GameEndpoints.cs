@@ -7,12 +7,22 @@ namespace Jeopareddy.Api.Endpoints;
 
 public static class GameEndpoints
 {
+    private const int MaxClueImageBytes = 1_048_576; // 1 MiB
+    private static readonly HashSet<string> AllowedClueImageMimeTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "image/png",
+        "image/jpeg",
+        "image/gif"
+    };
+
     public static IEndpointRouteBuilder MapGameEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapGet("/api/games", ListGamesAsync);
         app.MapPost("/api/games", CreateGameAsync);
         app.MapGet("/api/games/{gameId:guid}", GetGameAsync);
         app.MapPost("/api/games/{gameId:guid}/categories", CreateCategoryAsync);
+        app.MapPatch("/api/games/{gameId:guid}/categories/{categoryId:guid}", UpdateCategoryAsync);
+        app.MapDelete("/api/games/{gameId:guid}/categories/{categoryId:guid}", DeleteCategoryAsync);
         app.MapPost("/api/games/{gameId:guid}/start", StartGameAsync);
         app.MapPost("/api/games/{gameId:guid}/reset", ResetGameAsync);
         return app;
@@ -93,6 +103,8 @@ public static class GameEndpoints
                         cl.Id,
                         cl.Prompt,
                         cl.Answer,
+                        cl.ImageMimeType,
+                        cl.ImageBase64,
                         cl.PointValue,
                         cl.RowOrder,
                         cl.IsRevealed,
@@ -157,6 +169,12 @@ public static class GameEndpoints
             });
         }
 
+        var clueImageValidation = ValidateClueImages(request.Clues);
+        if (clueImageValidation is not null)
+        {
+            return clueImageValidation;
+        }
+
         var game = await db.Games.FirstOrDefaultAsync(g => g.Id == gameId);
         if (game is null)
         {
@@ -175,6 +193,8 @@ public static class GameEndpoints
                 GameId = gameId,
                 Prompt = cl.Prompt.Trim(),
                 Answer = cl.Answer.Trim(),
+                ImageMimeType = string.IsNullOrWhiteSpace(cl.ImageMimeType) ? null : cl.ImageMimeType.Trim().ToLowerInvariant(),
+                ImageBase64 = string.IsNullOrWhiteSpace(cl.ImageBase64) ? null : cl.ImageBase64.Trim(),
                 PointValue = cl.PointValue,
                 RowOrder = cl.RowOrder,
                 IsRevealed = false,
@@ -207,6 +227,83 @@ public static class GameEndpoints
             GameId: category.GameId,
             Name: category.Name,
             DisplayOrder: category.DisplayOrder));
+    }
+
+    private static async Task<IResult> UpdateCategoryAsync(Guid gameId, Guid categoryId, UpdateCategoryRequest request, JeopareddyDbContext db)
+    {
+        if (string.IsNullOrWhiteSpace(request.Name))
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["name"] = ["Name is required."]
+            });
+        }
+
+        if (request.DisplayOrder <= 0)
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["displayOrder"] = ["DisplayOrder must be greater than zero."]
+            });
+        }
+
+        var game = await db.Games.FirstOrDefaultAsync(g => g.Id == gameId);
+        if (game is null)
+        {
+            return Results.NotFound();
+        }
+
+        if (game.Status != GameStatus.Draft)
+        {
+            return Results.Conflict(new { message = "Categories can only be edited while the game is in Draft status." });
+        }
+
+        var category = await db.Categories.FirstOrDefaultAsync(c => c.Id == categoryId && c.GameId == gameId);
+        if (category is null)
+        {
+            return Results.NotFound();
+        }
+
+        category.Name = request.Name.Trim();
+        category.DisplayOrder = request.DisplayOrder;
+        game.UpdatedAtUtc = DateTime.UtcNow;
+
+        try
+        {
+            await db.SaveChangesAsync();
+        }
+        catch (DbUpdateException)
+        {
+            return Results.Conflict(new { message = "Category ordering conflicts with an existing category." });
+        }
+
+        return Results.NoContent();
+    }
+
+    private static async Task<IResult> DeleteCategoryAsync(Guid gameId, Guid categoryId, JeopareddyDbContext db)
+    {
+        var game = await db.Games.FirstOrDefaultAsync(g => g.Id == gameId);
+        if (game is null)
+        {
+            return Results.NotFound();
+        }
+
+        if (game.Status != GameStatus.Draft)
+        {
+            return Results.Conflict(new { message = "Categories can only be deleted while the game is in Draft status." });
+        }
+
+        var category = await db.Categories.FirstOrDefaultAsync(c => c.Id == categoryId && c.GameId == gameId);
+        if (category is null)
+        {
+            return Results.NotFound();
+        }
+
+        db.Categories.Remove(category);
+        game.UpdatedAtUtc = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+
+        return Results.NoContent();
     }
 
     private static async Task<IResult> StartGameAsync(Guid gameId, JeopareddyDbContext db)
@@ -253,5 +350,68 @@ public static class GameEndpoints
             Id: game.Id,
             Status: game.Status.ToString(),
             UpdatedAtUtc: game.UpdatedAtUtc));
+    }
+
+    private static IResult? ValidateClueImages(IReadOnlyList<CreateClueRequest> clues)
+    {
+        for (var i = 0; i < clues.Count; i++)
+        {
+            var clue = clues[i];
+            var hasMimeType = !string.IsNullOrWhiteSpace(clue.ImageMimeType);
+            var hasBase64 = !string.IsNullOrWhiteSpace(clue.ImageBase64);
+
+            if (!hasMimeType && !hasBase64)
+            {
+                continue;
+            }
+
+            if (!hasMimeType || !hasBase64)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    [$"clues[{i}]"] = ["ImageMimeType and ImageBase64 must both be provided when attaching an image."]
+                });
+            }
+
+            var mimeType = clue.ImageMimeType!.Trim();
+            if (!AllowedClueImageMimeTypes.Contains(mimeType))
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    [$"clues[{i}].imageMimeType"] = ["Only PNG, JPG/JPEG, and GIF images are allowed."]
+                });
+            }
+
+            byte[] imageBytes;
+            try
+            {
+                imageBytes = Convert.FromBase64String(clue.ImageBase64!.Trim());
+            }
+            catch (FormatException)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    [$"clues[{i}].imageBase64"] = ["ImageBase64 must be valid base64 data."]
+                });
+            }
+
+            if (imageBytes.Length == 0)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    [$"clues[{i}].imageBase64"] = ["Uploaded image is empty."]
+                });
+            }
+
+            if (imageBytes.Length > MaxClueImageBytes)
+            {
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    [$"clues[{i}].imageBase64"] = [$"Uploaded image exceeds the {MaxClueImageBytes} byte limit."]
+                });
+            }
+        }
+
+        return null;
     }
 }

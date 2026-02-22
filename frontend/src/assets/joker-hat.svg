@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 180" role="img" aria-label="Jester hat">
+  <g fill="none" stroke="#111111" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Main cap body -->
+    <path
+      d="M80 150
+         L80 108
+         C80 88 90 76 108 76
+         C119 76 128 82 132 92
+         C136 80 146 72 160 72
+         C180 72 194 86 194 108
+         L194 150
+         Z"
+      fill="#e53935"
+      stroke-width="6"
+    />
+
+    <!-- Left horn -->
+    <path
+      d="M95 96
+         C94 70 81 55 66 46
+         C53 38 40 35 26 38"
+      stroke-width="6"
+    />
+    <circle cx="20" cy="38" r="11" fill="#e53935" stroke-width="5"/>
+
+    <!-- Top horn -->
+    <path
+      d="M133 92
+         C136 70 147 53 164 40
+         C179 28 197 23 214 29"
+      stroke-width="6"
+    />
+    <circle cx="220" cy="30" r="10" fill="#e53935" stroke-width="5"/>
+
+    <!-- Right horn -->
+    <path
+      d="M175 98
+         C193 94 207 100 218 111
+         C228 121 233 131 230 143"
+      stroke-width="6"
+    />
+    <circle cx="228" cy="149" r="9" fill="#e53935" stroke-width="5"/>
+  </g>
+</svg>

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import InfoHint from './InfoHint'
 
 const MAX_CLUE_IMAGE_BYTES = 1_048_576
 const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/gif'] as const
@@ -139,7 +140,10 @@ export default function AddCategoryCard(props: AddCategoryCardProps) {
           <input id="category-name" value={categoryName} onChange={(event) => onCategoryNameChange(event.target.value)} placeholder="Category name" disabled={isDisabled} />
         </div>
         <div className="field">
-          <label htmlFor="category-order">Category Column</label>
+          <div className="field-label-row">
+            <label htmlFor="category-order">Category Column</label>
+            <InfoHint text="Determines left-to-right column position on the board." label="Category column help" />
+          </div>
           <input
             id="category-order"
             value={categoryOrder}
@@ -149,7 +153,6 @@ export default function AddCategoryCard(props: AddCategoryCardProps) {
             onChange={(event) => onCategoryOrderChange(Number(event.target.value))}
             placeholder="1 = first column"
           />
-          <div className="tiny muted">Determines left-to-right column position on the board.</div>
         </div>
       </div>
 

@@ -6,15 +6,17 @@ type BoardCardProps = {
   isBusy: boolean
   onEditCategory: (categoryId: string, payload: { name: string; displayOrder: number }) => void
   onDeleteCategory: (categoryId: string) => void
-  onEditClue: (
-    clueId: string,
+  onStartEditClue: (
     payload: {
+      categoryId: string
+      categoryName: string
+      categoryOrder: number
+      clueId: string
       prompt: string
       answer: string
       pointValue: number
-      rowOrder: number
-      imageMimeType?: string | null
-      imageBase64?: string | null
+      imageMimeType: string | null
+      imageBase64: string | null
     },
   ) => void
   onDeleteClue: (clueId: string) => void
@@ -23,7 +25,7 @@ type BoardCardProps = {
 }
 
 export default function BoardCard(props: BoardCardProps) {
-  const { categories, isDraft, isBusy, onEditCategory, onDeleteCategory, onEditClue, onDeleteClue, onToggleReveal, onToggleAnswered } = props
+  const { categories, isDraft, isBusy, onEditCategory, onDeleteCategory, onStartEditClue, onDeleteClue, onToggleReveal, onToggleAnswered } = props
 
   return (
     <section className="card card-board">
@@ -105,32 +107,14 @@ export default function BoardCard(props: BoardCardProps) {
                           disabled={isBusy}
                           type="button"
                           onClick={() => {
-                            const nextPrompt = window.prompt('Question text', clue.prompt)
-                            if (nextPrompt === null) {
-                              return
-                            }
-
-                            const nextAnswer = window.prompt('Expected answer', clue.answer)
-                            if (nextAnswer === null) {
-                              return
-                            }
-
-                            const nextValueRaw = window.prompt('Point value', String(clue.pointValue))
-                            if (nextValueRaw === null) {
-                              return
-                            }
-
-                            const nextValue = Number(nextValueRaw)
-                            if (!Number.isInteger(nextValue) || nextValue <= 0) {
-                              window.alert('Point value must be a positive whole number.')
-                              return
-                            }
-
-                            onEditClue(clue.id, {
-                              prompt: nextPrompt,
-                              answer: nextAnswer,
-                              pointValue: nextValue,
-                              rowOrder: rowOrderFromValue(nextValue),
+                            onStartEditClue({
+                              categoryId: category.id,
+                              categoryName: category.name,
+                              categoryOrder: category.displayOrder,
+                              clueId: clue.id,
+                              prompt: clue.prompt,
+                              answer: clue.answer,
+                              pointValue: clue.pointValue,
                               imageMimeType: clue.imageMimeType,
                               imageBase64: clue.imageBase64,
                             })
@@ -170,8 +154,4 @@ export default function BoardCard(props: BoardCardProps) {
       )}
     </section>
   )
-}
-
-function rowOrderFromValue(pointValue: number): number {
-  return Math.floor(pointValue / 100)
 }

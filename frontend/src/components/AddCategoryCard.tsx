@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import InfoHint from './InfoHint'
 
 const MAX_CLUE_IMAGE_BYTES = 1_048_576
 const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/gif'] as const
 
-type QuestionImageDraft = {
+export type QuestionImageDraft = {
   mimeType: string
   base64: string
   previewUrl: string
@@ -12,7 +12,7 @@ type QuestionImageDraft = {
   sizeBytes: number
 }
 
-type QuestionDraft = {
+export type QuestionDraft = {
   prompt: string
   answer: string
   pointValue: number
@@ -41,6 +41,22 @@ type AddCategoryCardProps = {
     displayOrder: number
     clues: CategoryQuestionPayload[]
   }) => Promise<void>
+  editingQuestion?: {
+    clueId: string
+    question: QuestionDraft
+  } | null
+  onSaveEditedQuestion?: (
+    clueId: string,
+    payload: {
+      prompt: string
+      answer: string
+      pointValue: number
+      rowOrder: number
+      imageMimeType?: string | null
+      imageBase64?: string | null
+    },
+  ) => Promise<void>
+  onCancelEditQuestion?: () => void
 }
 
 const defaultQuestion: QuestionDraft = {
@@ -53,14 +69,36 @@ const defaultQuestion: QuestionDraft = {
 const allowedValues = [100, 200, 300, 400, 500]
 
 export default function AddCategoryCard(props: AddCategoryCardProps) {
-  const { categoryName, categoryOrder, isBusy, canOperateOnGame, isLocked, onCategoryNameChange, onCategoryOrderChange, onAddCategory } = props
+  const {
+    categoryName,
+    categoryOrder,
+    isBusy,
+    canOperateOnGame,
+    isLocked,
+    onCategoryNameChange,
+    onCategoryOrderChange,
+    onAddCategory,
+    editingQuestion = null,
+    onSaveEditedQuestion,
+    onCancelEditQuestion,
+  } = props
 
   const [currentQuestion, setCurrentQuestion] = useState<QuestionDraft>(defaultQuestion)
   const [questions, setQuestions] = useState<QuestionDraft[]>([])
   const [imageError, setImageError] = useState('')
   const isDisabled = isBusy || !canOperateOnGame || isLocked
+  const isEditingQuestion = Boolean(editingQuestion)
 
   const hasDuplicateValue = questions.some((question) => question.pointValue === currentQuestion.pointValue)
+
+  useEffect(() => {
+    if (!editingQuestion) {
+      return
+    }
+
+    setCurrentQuestion(editingQuestion.question)
+    setImageError('')
+  }, [editingQuestion])
 
   const addQuestionToCategory = () => {
     const duplicate = questions.some((question) => question.pointValue === currentQuestion.pointValue)
@@ -132,6 +170,7 @@ export default function AddCategoryCard(props: AddCategoryCardProps) {
       <h2>Board Builder</h2>
       <p className="muted">Create one category and add several questions, then save once.</p>
       <p className="tiny muted">Typical setup: 5 categories with 5 questions each.</p>
+      {isEditingQuestion && <p className="tiny">Editing an existing question. Save changes below or cancel to return to add mode.</p>}
       {isLocked && <p className="tiny section-lock-note">Board builder is disabled while the game is in progress.</p>}
 
       <div className="grid">
@@ -230,15 +269,62 @@ export default function AddCategoryCard(props: AddCategoryCardProps) {
       </div>
 
       <div className="row">
-        <button
-          className="btn-secondary"
-          disabled={isDisabled || !currentQuestion.prompt || !currentQuestion.answer || hasDuplicateValue}
-          type="button"
-          onClick={addQuestionToCategory}
-        >
-          Add Question To Category
-        </button>
-        {hasDuplicateValue && <span className="tiny inline-error">This value is already used in this category.</span>}
+        {isEditingQuestion ? (
+          <>
+            <button
+              className="btn-success"
+              disabled={isDisabled || !currentQuestion.prompt || !currentQuestion.answer || !editingQuestion || !onSaveEditedQuestion}
+              type="button"
+              onClick={async () => {
+                if (!editingQuestion || !onSaveEditedQuestion) {
+                  return
+                }
+
+                await onSaveEditedQuestion(editingQuestion.clueId, {
+                  prompt: currentQuestion.prompt,
+                  answer: currentQuestion.answer,
+                  pointValue: currentQuestion.pointValue,
+                  rowOrder: rowOrderFromValue(currentQuestion.pointValue),
+                  imageMimeType: currentQuestion.image?.mimeType ?? null,
+                  imageBase64: currentQuestion.image?.base64 ?? null,
+                })
+                setCurrentQuestion({
+                  prompt: '',
+                  answer: '',
+                  pointValue: 100,
+                  image: null,
+                })
+                setImageError('')
+              }}
+            >
+              Save Edited Question
+            </button>
+            <button
+              className="btn-secondary"
+              disabled={isDisabled}
+              type="button"
+              onClick={() => {
+                setCurrentQuestion(defaultQuestion)
+                setImageError('')
+                onCancelEditQuestion?.()
+              }}
+            >
+              Cancel Edit
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              className="btn-secondary"
+              disabled={isDisabled || !currentQuestion.prompt || !currentQuestion.answer || hasDuplicateValue}
+              type="button"
+              onClick={addQuestionToCategory}
+            >
+              Add Question To Category
+            </button>
+            {hasDuplicateValue && <span className="tiny inline-error">This value is already used in this category.</span>}
+          </>
+        )}
       </div>
 
       {questions.length > 0 && (
@@ -314,4 +400,36 @@ function readFileAsDataUrl(file: File): Promise<string> {
     reader.onerror = () => reject(reader.error ?? new Error('FileReader failed'))
     reader.readAsDataURL(file)
   })
+}
+
+export function createQuestionDraftFromStoredClue(clue: {
+  prompt: string
+  answer: string
+  pointValue: number
+  imageMimeType: string | null
+  imageBase64: string | null
+}): QuestionDraft {
+  const image =
+    clue.imageMimeType && clue.imageBase64
+      ? {
+          mimeType: clue.imageMimeType,
+          base64: clue.imageBase64,
+          previewUrl: `data:${clue.imageMimeType};base64,${clue.imageBase64}`,
+          fileName: 'existing-image',
+          sizeBytes: estimateBase64ByteLength(clue.imageBase64),
+        }
+      : null
+
+  return {
+    prompt: clue.prompt,
+    answer: clue.answer,
+    pointValue: clue.pointValue,
+    image,
+  }
+}
+
+function estimateBase64ByteLength(base64: string): number {
+  const paddingMatch = base64.match(/=+$/)
+  const padding = paddingMatch ? paddingMatch[0].length : 0
+  return Math.max(0, Math.floor((base64.length * 3) / 4) - padding)
 }

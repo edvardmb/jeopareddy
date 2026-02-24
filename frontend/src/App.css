@@ -43,6 +43,20 @@
   margin-bottom: 1rem;
 }
 
+.brand-mark {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.brand-logo {
+  display: block;
+  width: auto;
+  height: clamp(56px, 9vw, 92px);
+  max-width: min(72vw, 560px);
+  object-fit: contain;
+}
+
 .app-header h1 {
   margin-bottom: 0.35rem;
   font-size: clamp(1.8rem, 3vw, 2.3rem);

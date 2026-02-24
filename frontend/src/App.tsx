@@ -17,7 +17,7 @@ import {
   updateClue,
   updateClueContent,
 } from './api'
-import AddCategoryCard from './components/AddCategoryCard'
+import AddCategoryCard, { createQuestionDraftFromStoredClue, type QuestionDraft } from './components/AddCategoryCard'
 import AddTeamCard from './components/AddTeamCard'
 import BoardCard from './components/BoardCard'
 import CreateGameCard from './components/CreateGameCard'
@@ -49,6 +49,7 @@ function App() {
   const [jokerEnabled, setJokerEnabled] = useState(false)
   const [jokerAppearancesPerGame, setJokerAppearancesPerGame] = useState(1)
   const [jokerAssignedClueIds, setJokerAssignedClueIds] = useState<string[]>([])
+  const [editingQuestion, setEditingQuestion] = useState<{ clueId: string; question: QuestionDraft } | null>(null)
 
   const canOperateOnGame = Boolean(loadedGame?.id)
   const isSetupLocked = loadedGame?.status === 'InProgress'
@@ -92,6 +93,10 @@ function App() {
 
   useEffect(() => {
     setJokerAssignedClueIds([])
+  }, [loadedGame?.id])
+
+  useEffect(() => {
+    setEditingQuestion(null)
   }, [loadedGame?.id])
 
   useEffect(() => {
@@ -166,9 +171,8 @@ function App() {
   return (
     <main className="page">
       <header className="app-header">
-        <div>
-          <h1>JeoparEddy</h1>
-          <p className="muted">Build, host, and play your game in one flow.</p>
+        <div className="brand-mark">
+          <img className="brand-logo" src="/jeoparEddy.png" alt="JeoparEddy" />
         </div>
         <div className="session-chip-wrap">
           <div className="session-chip">
@@ -328,6 +332,17 @@ function App() {
               isLocked={isSetupLocked}
               onCategoryNameChange={setCategoryName}
               onCategoryOrderChange={setCategoryOrder}
+              editingQuestion={editingQuestion}
+              onCancelEditQuestion={() => setEditingQuestion(null)}
+              onSaveEditedQuestion={(clueId, payload) =>
+                withBusy(async () => {
+                  await updateClueContent(loadedGame.id, clueId, payload)
+                  await loadGame(loadedGame.id)
+                  setEditingQuestion(null)
+                  setMessage('Question updated')
+                  setMessageTone('success')
+                })
+              }
               onAddCategory={(payload) =>
                 withBusy(async () => {
                   await addCategory(loadedGame.id, payload)
@@ -422,18 +437,21 @@ function App() {
                   setMessageTone('success')
                 })
               }
-              onEditClue={(clueId, payload) =>
-                withBusy(async () => {
-                  await updateClueContent(loadedGame.id, clueId, payload)
-                  await loadGame(loadedGame.id)
-                  setMessage('Question updated')
-                  setMessageTone('success')
+              onStartEditClue={(clue) => {
+                setCategoryName(clue.categoryName)
+                setCategoryOrder(clue.categoryOrder)
+                setEditingQuestion({
+                  clueId: clue.clueId,
+                  question: createQuestionDraftFromStoredClue(clue),
                 })
-              }
+                setMessage('Question loaded into Board Builder for editing')
+                setMessageTone('success')
+              }}
               onDeleteClue={(clueId) =>
                 withBusy(async () => {
                   await deleteClue(loadedGame.id, clueId)
                   await loadGame(loadedGame.id)
+                  setEditingQuestion((current) => (current?.clueId === clueId ? null : current))
                   setMessage('Question removed')
                   setMessageTone('success')
                 })

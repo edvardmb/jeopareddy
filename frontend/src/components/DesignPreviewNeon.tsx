@@ -1,23 +1,24 @@
+import { useTranslation } from 'react-i18next'
 import './DesignPreviewNeon.css'
 
 export default function DesignPreviewNeon() {
+  const { t } = useTranslation()
   const categories = ['Science', 'Movies', 'History', 'Music', 'Sports']
   const values = [100, 200, 300, 400, 500]
 
   return (
-    <section className="neon-shell" aria-label="Game Night Neon design preview">
+    <section className="neon-shell" aria-label={t('components.designPreviewNeon.ariaLabel')}>
       <header className="neon-hero">
         <div className="neon-hero-main">
-          <p className="neon-kicker">Game Night Neon Mockup</p>
-          <h2>Arcade Energy For Living-Room Play</h2>
+          <p className="neon-kicker">{t('components.designPreviewNeon.heroKicker')}</p>
+          <h2>{t('components.designPreviewNeon.heroTitle')}</h2>
           <p>
-            Bright tiles, bold scoreboards, and high-contrast game states inspired by Kahoot-like party interfaces. Visual
-            preview only.
+            {t('components.designPreviewNeon.heroSubtitle')}
           </p>
           <div className="neon-hero-actions">
-            <button type="button">Start Game Night</button>
+            <button type="button">{t('components.designPreviewNeon.startGameNight')}</button>
             <button type="button" className="secondary">
-              Load Existing
+              {t('components.designPreviewNeon.loadExisting')}
             </button>
           </div>
         </div>
@@ -25,20 +26,20 @@ export default function DesignPreviewNeon() {
           <div className="neon-chip pink">Friday Trivia Night</div>
           <div className="neon-stat-grid">
             <div>
-              <span>Categories</span>
+              <span>{t('components.designPreviewNeon.categories')}</span>
               <strong>5</strong>
             </div>
             <div>
-              <span>Teams</span>
+              <span>{t('components.designPreviewNeon.teams')}</span>
               <strong>3</strong>
             </div>
             <div>
-              <span>Status</span>
-              <strong>Draft</strong>
+              <span>{t('components.designPreviewNeon.status')}</span>
+              <strong>{t('status.draft')}</strong>
             </div>
             <div>
-              <span>Mode</span>
-              <strong>Host</strong>
+              <span>{t('components.designPreviewNeon.mode')}</span>
+              <strong>{t('components.designPreviewNeon.host')}</strong>
             </div>
           </div>
         </aside>
@@ -46,29 +47,29 @@ export default function DesignPreviewNeon() {
 
       <section className="neon-panels">
         <div className="neon-panel cyan">
-          <h3>Host Control</h3>
-          <p>Big primary actions and fast setup for teams, categories, and scoring.</p>
+          <h3>{t('components.designPreviewNeon.hostControlTitle')}</h3>
+          <p>{t('components.designPreviewNeon.hostControlSubtitle')}</p>
           <ul className="neon-bullets">
-            <li>Start / Reset controls are visually separated</li>
-            <li>Manual scoring is highlighted in orange</li>
-            <li>Board state controls show revealed / answered states clearly</li>
+            <li>{t('components.designPreviewNeon.hostBullet1')}</li>
+            <li>{t('components.designPreviewNeon.hostBullet2')}</li>
+            <li>{t('components.designPreviewNeon.hostBullet3')}</li>
           </ul>
         </div>
 
         <div className="neon-panel lime">
-          <h3>Turn Tracker</h3>
-          <p>Current team is always visible and glows in the scoreboard and answer modal.</p>
+          <h3>{t('components.designPreviewNeon.turnTrackerTitle')}</h3>
+          <p>{t('components.designPreviewNeon.turnTrackerSubtitle')}</p>
           <div className="neon-turn-box">
-            <span>Now answering</span>
+            <span>{t('components.designPreviewNeon.nowAnswering')}</span>
             <strong>Team A</strong>
-            <small>Next: Team B</small>
+            <small>{t('components.designPreviewNeon.nextTeam')}</small>
           </div>
         </div>
       </section>
 
       <section className="neon-board-card">
         <div className="neon-board-top">
-          <h3>Play Board</h3>
+          <h3>{t('components.designPreviewNeon.playBoard')}</h3>
           <div className="neon-scoreboard">
             <div className="neon-score-row active">
               <span>Team A</span>
@@ -112,22 +113,22 @@ export default function DesignPreviewNeon() {
       <section className="neon-modal-demo">
         <div className="neon-modal">
           <div className="neon-modal-pills">
-            <span className="neon-chip lime">Team A Turn</span>
-            <span className="neon-chip yellow">300 points</span>
+            <span className="neon-chip lime">{t('components.designPreviewNeon.teamATurn')}</span>
+            <span className="neon-chip yellow">{t('components.designPreviewNeon.pointsPill')}</span>
           </div>
-          <h3>Question Card</h3>
+          <h3>{t('components.designPreviewNeon.questionCard')}</h3>
           <p className="neon-question">This planet is known as the Red Planet.</p>
           <label>
-            Answer
+            {t('components.designPreviewNeon.answerLabel')}
             <input type="text" value="mars" readOnly />
           </label>
           <div className="neon-hero-actions">
-            <button type="button">Submit Answer</button>
+            <button type="button">{t('components.designPreviewNeon.submitAnswer')}</button>
             <button type="button" className="secondary">
-              Close
+              {t('common.close')}
             </button>
           </div>
-          <p className="neon-feedback">Correct! +300 points</p>
+          <p className="neon-feedback">{t('components.designPreviewNeon.feedbackCorrect')}</p>
         </div>
       </section>
     </section>

@@ -1,4 +1,5 @@
 import { Category } from '../api'
+import { useTranslation } from 'react-i18next'
 
 type BoardCardProps = {
   categories: Category[]
@@ -25,15 +26,16 @@ type BoardCardProps = {
 }
 
 export default function BoardCard(props: BoardCardProps) {
+  const { t } = useTranslation()
   const { categories, isDraft, isBusy, onEditCategory, onDeleteCategory, onStartEditClue, onDeleteClue, onToggleReveal, onToggleAnswered } = props
 
   return (
     <section className="card card-board">
-      <h2>Play Board</h2>
-      <p className="muted">Reveal each question and mark it answered as teams play.</p>
-      {!isDraft && <p className="tiny section-lock-note">Category and question edit/delete is only available while the game is in Draft.</p>}
+      <h2>{t('components.boardCard.title')}</h2>
+      <p className="muted">{t('components.boardCard.subtitle')}</p>
+      {!isDraft && <p className="tiny section-lock-note">{t('components.boardCard.draftOnlyNote')}</p>}
       {categories.length === 0 ? (
-        <p className="muted">No categories yet</p>
+        <p className="muted">{t('components.boardCard.noCategories')}</p>
       ) : (
         categories.map((category) => (
           <details key={category.id} className="category accordion-category">
@@ -41,7 +43,7 @@ export default function BoardCard(props: BoardCardProps) {
               <span className="category-summary-title">
                 {category.displayOrder}. {category.name}
               </span>
-              <span className="tiny muted">{category.clues.length} question(s)</span>
+              <span className="tiny muted">{t('components.boardCard.questionsCount', { count: category.clues.length })}</span>
             </summary>
             {isDraft && (
               <div className="row" style={{ marginTop: '0.6rem' }}>
@@ -50,33 +52,33 @@ export default function BoardCard(props: BoardCardProps) {
                   disabled={isBusy}
                   type="button"
                   onClick={() => {
-                    const nextName = window.prompt('Category name', category.name)
+                    const nextName = window.prompt(t('components.boardCard.promptCategoryName'), category.name)
                     if (nextName === null) {
                       return
                     }
 
-                    const nextOrderRaw = window.prompt('Category column/order', String(category.displayOrder))
+                    const nextOrderRaw = window.prompt(t('components.boardCard.promptCategoryOrder'), String(category.displayOrder))
                     if (nextOrderRaw === null) {
                       return
                     }
 
                     const nextOrder = Number(nextOrderRaw)
                     if (!Number.isInteger(nextOrder) || nextOrder <= 0) {
-                      window.alert('Category column/order must be a positive whole number.')
+                      window.alert(t('components.boardCard.invalidCategoryOrder'))
                       return
                     }
 
                     onEditCategory(category.id, { name: nextName, displayOrder: nextOrder })
                   }}
                 >
-                  Edit Category
+                  {t('components.boardCard.editCategory')}
                 </button>
                 <button
                   className="btn-danger"
                   disabled={isBusy}
                   type="button"
                   onClick={() => {
-                    const confirmed = window.confirm(`Delete category "${category.name}" and all its questions?`)
+                    const confirmed = window.confirm(t('components.boardCard.confirmDeleteCategory', { name: category.name }))
                     if (!confirmed) {
                       return
                     }
@@ -84,7 +86,7 @@ export default function BoardCard(props: BoardCardProps) {
                     onDeleteCategory(category.id)
                   }}
                 >
-                  Remove Category
+                  {t('components.boardCard.removeCategory')}
                 </button>
               </div>
             )}
@@ -93,12 +95,16 @@ export default function BoardCard(props: BoardCardProps) {
                 <li key={clue.id} className="clue-admin-item">
                   <div className="clue-admin-text">
                     <strong>{clue.pointValue}</strong> - {clue.prompt}
-                    {clue.imageBase64 ? ' (image)' : ''}
+                    {clue.imageBase64 ? ` ${t('components.boardCard.imageTag')}` : ''}
                   </div>
                   <div className="row clue-admin-controls">
                     <span className="clue-admin-status">
-                      <span className={`state-pill ${clue.isRevealed ? 'is-on' : ''}`}>Revealed: {clue.isRevealed ? 'Yes' : 'No'}</span>
-                      <span className={`state-pill ${clue.isAnswered ? 'is-on' : ''}`}>Answered: {clue.isAnswered ? 'Yes' : 'No'}</span>
+                      <span className={`state-pill ${clue.isRevealed ? 'is-on' : ''}`}>
+                        {t('components.boardCard.revealedLabel')}: {clue.isRevealed ? t('common.yes') : t('common.no')}
+                      </span>
+                      <span className={`state-pill ${clue.isAnswered ? 'is-on' : ''}`}>
+                        {t('components.boardCard.answeredLabel')}: {clue.isAnswered ? t('common.yes') : t('common.no')}
+                      </span>
                     </span>
                     {isDraft && (
                       <>
@@ -120,14 +126,14 @@ export default function BoardCard(props: BoardCardProps) {
                             })
                           }}
                         >
-                          Edit Question
+                          {t('components.boardCard.editQuestion')}
                         </button>
                         <button
                           className="btn-danger"
                           disabled={isBusy}
                           type="button"
                           onClick={() => {
-                            const confirmed = window.confirm(`Delete question "${clue.prompt}"?`)
+                            const confirmed = window.confirm(t('components.boardCard.confirmDeleteQuestion', { prompt: clue.prompt }))
                             if (!confirmed) {
                               return
                             }
@@ -135,15 +141,15 @@ export default function BoardCard(props: BoardCardProps) {
                             onDeleteClue(clue.id)
                           }}
                         >
-                          Remove Question
+                          {t('components.boardCard.removeQuestion')}
                         </button>
                       </>
                     )}
                     <button className="btn-secondary" disabled={isBusy} onClick={() => onToggleReveal(clue.id, clue.isRevealed)}>
-                      Reveal/Hide
+                      {t('components.boardCard.revealHide')}
                     </button>
                     <button className="btn-secondary" disabled={isBusy} onClick={() => onToggleAnswered(clue.id, clue.isAnswered)}>
-                      Mark Answered
+                      {t('components.boardCard.markAnswered')}
                     </button>
                   </div>
                 </li>

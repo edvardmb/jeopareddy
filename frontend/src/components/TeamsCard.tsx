@@ -1,4 +1,5 @@
 import { Team } from '../api'
+import { useTranslation } from 'react-i18next'
 
 type TeamsCardProps = {
   teams: Team[]
@@ -10,21 +11,22 @@ type TeamsCardProps = {
 }
 
 export default function TeamsCard(props: TeamsCardProps) {
+  const { t } = useTranslation()
   const { teams, isDraft = false, isBusy = false, currentTurnTeamId, onSetTurnTeamId, onDeleteTeam } = props
   const rankedTeams = [...teams].sort((a, b) => b.score - a.score || a.displayOrder - b.displayOrder)
 
   return (
     <section className="card card-scoreboard">
-      <h2>Live Scoreboard</h2>
+      <h2>{t('components.teamsCard.title')}</h2>
       {rankedTeams.length === 0 ? (
-        <p className="muted">No teams yet</p>
+        <p className="muted">{t('components.teamsCard.noTeams')}</p>
       ) : (
         <ul className="list scoreboard-list">
           {rankedTeams.map((team, index) => (
             <li key={team.id} className={`scoreboard-item ${team.id === currentTurnTeamId ? 'current-turn' : ''}`}>
               <span className="scoreboard-rank">{index + 1}</span>
               <strong>{team.name}</strong>
-              <span className="scoreboard-points">{team.score} pts</span>
+              <span className="scoreboard-points">{team.score} {t('common.pointsShort')}</span>
               {(onSetTurnTeamId || (isDraft && onDeleteTeam)) && (
                 <div className="scoreboard-actions">
                   {onSetTurnTeamId && (
@@ -33,9 +35,9 @@ export default function TeamsCard(props: TeamsCardProps) {
                       className={team.id === currentTurnTeamId ? 'btn-success scoreboard-turn-btn' : 'btn-secondary scoreboard-turn-btn'}
                       disabled={isBusy || team.id === currentTurnTeamId}
                       onClick={() => onSetTurnTeamId(team.id)}
-                      aria-label={`Set ${team.name} as current turn`}
+                      aria-label={t('components.teamsCard.setTurnAria', { teamName: team.name })}
                     >
-                      {team.id === currentTurnTeamId ? 'Turn' : 'Set Turn'}
+                      {team.id === currentTurnTeamId ? t('components.teamsCard.turn') : t('components.teamsCard.setTurn')}
                     </button>
                   )}
                   {isDraft && onDeleteTeam && (
@@ -44,10 +46,10 @@ export default function TeamsCard(props: TeamsCardProps) {
                       className="btn-danger scoreboard-remove-btn"
                       disabled={isBusy}
                       onClick={() => onDeleteTeam(team.id)}
-                      aria-label={`Remove ${team.name}`}
-                      title={`Remove ${team.name}`}
+                      aria-label={t('components.teamsCard.removeAria', { teamName: team.name })}
+                      title={t('components.teamsCard.removeAria', { teamName: team.name })}
                     >
-                      Remove
+                      {t('common.remove')}
                     </button>
                   )}
                 </div>

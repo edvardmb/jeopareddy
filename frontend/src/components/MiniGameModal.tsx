@@ -1,4 +1,5 @@
 import { ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 
 type MiniGameModalProps = {
   title: string
@@ -10,7 +11,8 @@ type MiniGameModalProps = {
 }
 
 export default function MiniGameModal(props: MiniGameModalProps) {
-  const { title, subtitle, onClose, closeLabel = 'Close Mini-Game', headerVisual, children } = props
+  const { t } = useTranslation()
+  const { title, subtitle, onClose, closeLabel = t('components.miniGameModal.closeLabel'), headerVisual, children } = props
 
   return (
     <div className="minigame-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="minigame-modal-title">

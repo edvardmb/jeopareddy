@@ -119,6 +119,12 @@ export function addTeam(gameId: string, name: string): Promise<void> {
   })
 }
 
+export function deleteTeam(gameId: string, teamId: string): Promise<void> {
+  return requestNoBody(`/api/games/${gameId}/teams/${teamId}`, {
+    method: 'DELETE',
+  })
+}
+
 export function addCategory(
   gameId: string,
   payload: {

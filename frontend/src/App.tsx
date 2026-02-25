@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   API_BASE_URL,
   addCategory,
@@ -30,9 +31,13 @@ import PlayModeView from './components/PlayModeView'
 import ScoreEventCard from './components/ScoreEventCard'
 import TeamsCard from './components/TeamsCard'
 import InfoHint from './components/InfoHint'
+import LanguageSelector from './components/LanguageSelector'
 import './App.css'
+import type { SupportedLanguage } from './i18n'
+import { translateGameStatus } from './i18nHelpers'
 
 function App() {
+  const { t, i18n } = useTranslation()
   const [gameTitle, setGameTitle] = useState('Friday Trivia Night')
   const [gameIdInput, setGameIdInput] = useState('')
   const [games, setGames] = useState<GameListItem[]>([])
@@ -62,6 +67,12 @@ function App() {
   const isSetupLocked = loadedGame?.status === 'InProgress'
   const scoreTeams = useMemo(() => loadedGame?.teams ?? [], [loadedGame])
   const loadGameRequestSeqRef = useRef(0)
+  const selectedLanguage: SupportedLanguage = i18n.resolvedLanguage?.startsWith('no') ? 'no' : 'en'
+
+  const changeLanguage = (language: SupportedLanguage) => {
+    void i18n.changeLanguage(language)
+    globalThis.localStorage?.setItem('jeopareddy.language', language)
+  }
 
   const loadGame = async (gameId: string) => {
     const requestSeq = ++loadGameRequestSeqRef.current
@@ -88,7 +99,7 @@ function App() {
       setMessageTone('')
       await action()
     } catch (error) {
-      const text = error instanceof Error ? error.message : 'Request failed'
+      const text = error instanceof Error ? error.message : t('messages.requestFailed')
       setMessage(text)
       setMessageTone('error')
     } finally {
@@ -98,10 +109,10 @@ function App() {
 
   useEffect(() => {
     refreshGames().catch(() => {
-      setMessage('Could not load games list')
+      setMessage(t('messages.couldNotLoadGamesList'))
       setMessageTone('error')
     })
-  }, [])
+  }, [t])
 
   useEffect(() => {
     setJokerAssignedClueIds([])
@@ -283,43 +294,44 @@ function App() {
               <>
                 <strong>{loadedGame.title}</strong>
                 <span className="tiny muted">
-                  {loadedGame.status}
+                  {translateGameStatus(loadedGame.status, t)}
                 </span>
               </>
             ) : (
-              <span className="tiny muted">No game loaded</span>
+              <span className="tiny muted">{t('status.noGameLoaded')}</span>
             )}
           </div>
+          <LanguageSelector value={selectedLanguage} onChange={changeLanguage} />
           <div className="tiny muted">API: {API_BASE_URL}</div>
         </div>
       </header>
 
       <nav className="tab-bar" aria-label="Primary navigation">
         <button className={activeSection === 'dashboard' ? 'tab-btn active' : 'tab-btn'} onClick={() => setActiveSection('dashboard')}>
-          Dashboard
+          {t('nav.dashboard')}
         </button>
         <button className={activeSection === 'preview' ? 'tab-btn active' : 'tab-btn'} onClick={() => setActiveSection('preview')}>
-          Design Preview
+          {t('nav.designPreview')}
         </button>
         <button
           className={activeSection === 'preview-neon' ? 'tab-btn active' : 'tab-btn'}
           onClick={() => setActiveSection('preview-neon')}
         >
-          Neon Preview
+          {t('nav.neonPreview')}
         </button>
         <button
           className={activeSection === 'host' ? 'tab-btn active' : 'tab-btn'}
           disabled={!loadedGame}
           onClick={() => setActiveSection('host')}
         >
-          Host Control
+          {t('nav.hostControl')}
         </button>
         <button
           className={activeSection === 'play' ? 'tab-btn active' : 'tab-btn'}
           disabled={!loadedGame}
           onClick={() => setActiveSection('play')}
         >
-          Play
+          {t('nav.play')}
         </button>
       </nav>
       {message && <p className={`message ${messageTone}`}>{message}</p>}
@@ -338,7 +350,7 @@ function App() {
                 const game = await createGame(gameTitle)
                 setLoadedGame(game)
                 setGameIdInput(game.id)
-                setMessage(`Created game: ${game.id}`)
+                setMessage(t('messages.createdGame', { id: game.id }))
                 setMessageTone('success')
                 setActiveSection('host')
                 await refreshGames()
@@ -354,7 +366,7 @@ function App() {
             onLoad={() =>
               withBusy(async () => {
                 await loadGame(gameIdInput)
-                setMessage(`Loaded game: ${gameIdInput}`)
+                setMessage(t('messages.loadedGame', { id: gameIdInput }))
                 setMessageTone('success')
                 setActiveSection('host')
               })
@@ -362,14 +374,14 @@ function App() {
             onRefresh={() =>
               withBusy(async () => {
                 await refreshGames()
-                setMessage('Games list refreshed')
+                setMessage(t('messages.gamesListRefreshed'))
                 setMessageTone('success')
               })
             }
             onLoadFromList={(gameId) =>
               withBusy(async () => {
                 await loadGame(gameId)
-                setMessage(`Loaded game: ${gameId}`)
+                setMessage(t('messages.loadedGame', { id: gameId }))
                 setMessageTone('success')
                 setActiveSection('host')
               })
@@ -380,9 +392,9 @@ function App() {
 
       {!loadedGame && activeSection !== 'dashboard' && (
         <section className="card">
-          <h2>No Active Game</h2>
-          <p className="muted">Create or load a game on Dashboard first.</p>
-          <button onClick={() => setActiveSection('dashboard')}>Go To Dashboard</button>
+          <h2>{t('app.noActiveGame')}</h2>
+          <p className="muted">{t('app.noActiveGameHelp')}</p>
+          <button onClick={() => setActiveSection('dashboard')}>{t('app.goToDashboard')}</button>
         </section>
       )}
 
@@ -396,7 +408,7 @@ function App() {
                 withBusy(async () => {
                   await startGame(loadedGame.id)
                   await loadGame(loadedGame.id)
-                  setMessage('Game moved to InProgress')
+                  setMessage(t('messages.gameMovedInProgress'))
                   setMessageTone('success')
                 })
               }
@@ -406,7 +418,7 @@ function App() {
                   setJokerAssignedClueIds([])
                   setGenderRevealAssignedClueIds([])
                   await loadGame(loadedGame.id)
-                  setMessage('Game reset to Draft with cleared scores and clues')
+                  setMessage(t('messages.gameReset'))
                   setMessageTone('success')
                 })
               }
@@ -422,7 +434,7 @@ function App() {
                 withBusy(async () => {
                   await addTeam(loadedGame.id, teamName)
                   await loadGame(loadedGame.id)
-                  setMessage(`Team "${teamName}" added`)
+                  setMessage(t('messages.teamAdded', { name: teamName }))
                   setMessageTone('success')
                 })
               }
@@ -443,7 +455,7 @@ function App() {
                   await updateClueContent(loadedGame.id, clueId, payload)
                   await loadGame(loadedGame.id)
                   setEditingQuestion(null)
-                  setMessage('Question updated')
+                  setMessage(t('messages.questionUpdated'))
                   setMessageTone('success')
                 })
               }
@@ -451,31 +463,31 @@ function App() {
                 withBusy(async () => {
                   await addCategory(loadedGame.id, payload)
                   await loadGame(loadedGame.id)
-                  setMessage(`Category "${payload.name}" added with ${payload.clues.length} question(s)`)
+                  setMessage(t('messages.categoryAdded', { name: payload.name, count: payload.clues.length }))
                   setMessageTone('success')
                 })
               }
             />
 
             <section className={`card card-sky ${isSetupLocked ? 'card-disabled' : ''}`}>
-              <h2>Joker Mini-Game</h2>
-              <p className="muted">Randomly replace some clue reveals with the Joker ladder mini-game.</p>
+              <h2>{t('sections.jokerTitle')}</h2>
+              <p className="muted">{t('sections.jokerHelp')}</p>
               <div className="grid">
                 <div className="field">
-                  <label>Include Joker In Game</label>
+                  <label>{t('sections.includeJoker')}</label>
                   <button
                     type="button"
                     className={jokerEnabled ? 'btn-success' : 'btn-secondary'}
                     disabled={isBusy || !loadedGame || isSetupLocked}
                     onClick={() => setJokerEnabled((value) => !value)}
                   >
-                    {jokerEnabled ? 'Enabled' : 'Disabled'}
+                    {jokerEnabled ? t('common.enabled') : t('common.disabled')}
                   </button>
                 </div>
                 <div className="field">
                   <div className="field-label-row">
-                    <label htmlFor="joker-appearances">Appearances Per Game</label>
-                    <InfoHint text="How many clues will trigger Joker before the question appears." label="Joker appearances help" />
+                    <label htmlFor="joker-appearances">{t('sections.appearancesPerGame')}</label>
+                    <InfoHint text={t('sections.jokerAppearancesHelp')} label={t('sections.jokerAppearancesHelpLabel')} />
                   </div>
                   <input
                     id="joker-appearances"
@@ -489,8 +501,8 @@ function App() {
                 </div>
                 <div className="field">
                   <div className="field-label-row">
-                    <label htmlFor="joker-spot-count">Joker Spots (of 10)</label>
-                    <InfoHint text="Increase to make JOKER more likely in the mini-game." label="Joker spots help" />
+                    <label htmlFor="joker-spot-count">{t('sections.jokerSpots')}</label>
+                    <InfoHint text={t('sections.jokerSpotsHelp')} label={t('sections.jokerSpotsHelpLabel')} />
                   </div>
                   <input
                     id="joker-spot-count"
@@ -504,8 +516,8 @@ function App() {
                 </div>
                 <div className="field">
                   <div className="field-label-row">
-                    <label htmlFor="thief-spot-count">Thief Spots (of 10)</label>
-                    <InfoHint text="Increase to make THIEF more likely in the mini-game." label="Thief spots help" />
+                    <label htmlFor="thief-spot-count">{t('sections.thiefSpots')}</label>
+                    <InfoHint text={t('sections.thiefSpotsHelp')} label={t('sections.thiefSpotsHelpLabel')} />
                   </div>
                   <input
                     id="thief-spot-count"
@@ -518,34 +530,38 @@ function App() {
                   />
                 </div>
               </div>
-              <p className="tiny muted">10 hidden spots per Joker game. If Joker + Thief spots exceed 10, Thief spots are capped.</p>
+              <p className="tiny muted">{t('sections.jokerSpotFootnote')}</p>
               <p className="tiny muted">
-                Assigned this game: {jokerStats.totalAssigned} • Triggered: {jokerStats.completed} • Remaining: {jokerStats.remaining}
+                {t('sections.assignedStats', {
+                  total: jokerStats.totalAssigned,
+                  completed: jokerStats.completed,
+                  remaining: jokerStats.remaining,
+                })}
               </p>
-              <p className="tiny muted">These settings are local to the current host session (not saved in the backend yet).</p>
+              <p className="tiny muted">{t('sections.localOnly')}</p>
             </section>
 
             <section className={`card card-sky ${isSetupLocked ? 'card-disabled' : ''}`}>
-              <h2>Gender Reveal Mini-Game</h2>
-              <p className="muted">Split pink/blue reveal modal. Correct guess awards +50 bonus points, wrong guess costs nothing.</p>
+              <h2>{t('sections.genderTitle')}</h2>
+              <p className="muted">{t('sections.genderHelp')}</p>
               <div className="grid">
                 <div className="field">
-                  <label>Include Gender Reveal In Game</label>
+                  <label>{t('sections.includeGender')}</label>
                   <button
                     type="button"
                     className={genderRevealEnabled ? 'btn-success' : 'btn-secondary'}
                     disabled={isBusy || !loadedGame || isSetupLocked}
                     onClick={() => setGenderRevealEnabled((value) => !value)}
                   >
-                    {genderRevealEnabled ? 'Enabled' : 'Disabled'}
+                    {genderRevealEnabled ? t('common.enabled') : t('common.disabled')}
                   </button>
                 </div>
                 <div className="field">
                   <div className="field-label-row">
-                    <label htmlFor="gender-reveal-appearances">Appearances Per Game</label>
+                    <label htmlFor="gender-reveal-appearances">{t('sections.appearancesPerGame')}</label>
                     <InfoHint
-                      text="How many clues will trigger the gender reveal minigame before the question appears. Joker assignments take priority if both are enabled."
-                      label="Gender reveal appearances help"
+                      text={t('sections.genderAppearancesHelp')}
+                      label={t('sections.genderAppearancesHelpLabel')}
                     />
                   </div>
                   <input
@@ -560,10 +576,14 @@ function App() {
                 </div>
               </div>
               <p className="tiny muted">
-                Assigned this game: {genderRevealStats.totalAssigned} • Triggered: {genderRevealStats.completed} • Remaining: {genderRevealStats.remaining}
+                {t('sections.assignedStats', {
+                  total: genderRevealStats.totalAssigned,
+                  completed: genderRevealStats.completed,
+                  remaining: genderRevealStats.remaining,
+                })}
               </p>
-              <p className="tiny muted">Reveal outcome is currently set to boy for this event.</p>
-              <p className="tiny muted">These settings are local to the current host session (not saved in the backend yet).</p>
+              <p className="tiny muted">{t('sections.genderOutcomeNote')}</p>
+              <p className="tiny muted">{t('sections.localOnly')}</p>
             </section>
           </div>
 
@@ -581,7 +601,7 @@ function App() {
                   await loadGame(loadedGame.id)
                   setScoreTeamId((current) => (current === teamId ? '' : current))
                   setCurrentTurnTeamId((current) => (current === teamId ? '' : current))
-                  setMessage(team ? `Team "${team.name}" removed` : 'Team removed')
+                  setMessage(team ? t('messages.teamRemoved', { name: team.name }) : t('messages.teamRemovedGeneric'))
                   setMessageTone('success')
                 })
               }
@@ -605,7 +625,7 @@ function App() {
                     reason: scoreReason,
                   })
                   await loadGame(loadedGame.id)
-                  setMessage('Score updated')
+                  setMessage(t('messages.scoreUpdated'))
                   setMessageTone('success')
                 })
               }
@@ -618,7 +638,7 @@ function App() {
                 withBusy(async () => {
                   await updateCategory(loadedGame.id, categoryId, payload)
                   await loadGame(loadedGame.id)
-                  setMessage('Category updated')
+                  setMessage(t('messages.categoryUpdated'))
                   setMessageTone('success')
                 })
               }
@@ -626,7 +646,7 @@ function App() {
                 withBusy(async () => {
                   await deleteCategory(loadedGame.id, categoryId)
                   await loadGame(loadedGame.id)
-                  setMessage('Category removed')
+                  setMessage(t('messages.categoryRemoved'))
                   setMessageTone('success')
                 })
               }
@@ -637,7 +657,7 @@ function App() {
                   clueId: clue.clueId,
                   question: createQuestionDraftFromStoredClue(clue),
                 })
-                setMessage('Question loaded into Board Builder for editing')
+                setMessage(t('messages.questionLoadedForEdit'))
                 setMessageTone('success')
               }}
               onDeleteClue={(clueId) =>
@@ -645,7 +665,7 @@ function App() {
                   await deleteClue(loadedGame.id, clueId)
                   await loadGame(loadedGame.id)
                   setEditingQuestion((current) => (current?.clueId === clueId ? null : current))
-                  setMessage('Question removed')
+                  setMessage(t('messages.questionRemoved'))
                   setMessageTone('success')
                 })
               }
@@ -653,7 +673,7 @@ function App() {
                 withBusy(async () => {
                   await updateClue(loadedGame.id, clueId, { isRevealed: !currentValue })
                   await loadGame(loadedGame.id)
-                  setMessage('Clue reveal state updated')
+                  setMessage(t('messages.clueRevealUpdated'))
                   setMessageTone('success')
                 })
               }
@@ -661,7 +681,7 @@ function App() {
                 withBusy(async () => {
                   await updateClue(loadedGame.id, clueId, { isAnswered: !currentValue })
                   await loadGame(loadedGame.id)
-                  setMessage('Clue answer state updated')
+                  setMessage(t('messages.clueAnswerUpdated'))
                   setMessageTone('success')
                 })
               }
@@ -692,11 +712,15 @@ function App() {
                 teamId,
                 clueId: clue.id,
                 deltaPoints: isCorrect ? resolvedPointValue : -resolvedPointValue,
-                reason: isCorrect ? 'Correct answer' : 'Incorrect answer',
+                reason: isCorrect ? t('messages.correctAnswer') : t('messages.incorrectAnswer'),
               })
               await updateClue(loadedGame.id, clue.id, { isRevealed: true, isAnswered: true })
               await loadGame(loadedGame.id)
-              setMessage(isCorrect ? `Point awarded: ${resolvedPointValue}` : `Points deducted: ${resolvedPointValue}`)
+              setMessage(
+                isCorrect
+                  ? t('messages.pointAwarded', { points: resolvedPointValue })
+                  : t('messages.pointsDeducted', { points: resolvedPointValue }),
+              )
               setMessageTone(isCorrect ? 'success' : 'error')
             })
           }
@@ -728,5 +752,6 @@ function sameStringSet(left: string[], right: string[]): boolean {
   const rightSet = new Set(right)
   return left.every((item) => rightSet.has(item))
 }
+
 
 

@@ -1,75 +1,76 @@
+import { useTranslation } from 'react-i18next'
 import './DesignPreview.css'
 
 export default function DesignPreview() {
+  const { t } = useTranslation()
   const categories = ['Science', 'Movies', 'History', 'Music', 'Sports']
   const values = [100, 200, 300, 400, 500]
 
   return (
-    <section className="preview-shell" aria-label="Design preview">
+    <section className="preview-shell" aria-label={t('components.designPreview.ariaLabel')}>
       <header className="preview-hero">
         <div>
-          <p className="preview-kicker">Friendly Learning Mockup</p>
-          <h2>Jeopareddy Design Preview</h2>
+          <p className="preview-kicker">{t('components.designPreview.heroKicker')}</p>
+          <h2>{t('components.designPreview.heroTitle')}</h2>
           <p className="preview-subtitle">
-            A colorful, playful UI direction inspired by learning apps. This preview is visual only and does not change game
-            behavior.
+            {t('components.designPreview.heroSubtitle')}
           </p>
         </div>
         <div className="preview-status-card">
-          <div className="preview-pill preview-pill-blue">Draft</div>
+          <div className="preview-pill preview-pill-blue">{t('status.draft')}</div>
           <strong>Friday Trivia Night</strong>
-          <span>5 categories • 3 teams • Ready to host</span>
-          <button type="button">Continue To Host Control</button>
+          <span>{t('components.designPreview.readyStatus')}</span>
+          <button type="button">{t('components.designPreview.continueHost')}</button>
         </div>
       </header>
 
       <div className="preview-grid">
         <section className="preview-card preview-card-blue">
           <div className="preview-card-head">
-            <h3>Create a New Game</h3>
-            <span className="preview-tag">Primary</span>
+            <h3>{t('components.designPreview.createTitle')}</h3>
+            <span className="preview-tag">{t('components.designPreview.primaryTag')}</span>
           </div>
-          <p>Start a fresh board with a title and jump directly into setup.</p>
+          <p>{t('components.designPreview.createSubtitle')}</p>
           <label>
-            Game title
+            {t('components.designPreview.gameTitleLabel')}
             <input type="text" value="Friday Trivia Night" readOnly />
           </label>
           <div className="preview-actions">
-            <button type="button">Create Game</button>
+            <button type="button">{t('components.designPreview.createGame')}</button>
             <button type="button" className="secondary">
-              Duplicate Last
+              {t('components.designPreview.duplicateLast')}
             </button>
           </div>
         </section>
 
         <section className="preview-card preview-card-green">
           <div className="preview-card-head">
-            <h3>Teams & Turn Order</h3>
-            <span className="preview-tag">Setup</span>
+            <h3>{t('components.designPreview.teamsTitle')}</h3>
+            <span className="preview-tag">{t('components.designPreview.setupTag')}</span>
           </div>
-          <p>First team added starts. Turn order rotates automatically while playing.</p>
+          <p>{t('components.designPreview.teamsSubtitle')}</p>
           <ul className="preview-team-list">
             <li>
               <span className="rank">1</span>
               <span>Team A</span>
-              <span className="score">600 pts</span>
-              <span className="turn-badge">Your Turn</span>
+              <span className="score">600 {t('common.pointsShort')}</span>
+              <span className="turn-badge">{t('components.designPreview.yourTurn')}</span>
             </li>
             <li>
               <span className="rank">2</span>
               <span>Team B</span>
-              <span className="score">400 pts</span>
+              <span className="score">400 {t('common.pointsShort')}</span>
             </li>
             <li>
               <span className="rank">3</span>
               <span>Team C</span>
-              <span className="score">200 pts</span>
+              <span className="score">200 {t('common.pointsShort')}</span>
             </li>
           </ul>
           <div className="preview-actions">
-            <button type="button">Add Team</button>
+            <button type="button">{t('components.designPreview.addTeam')}</button>
             <button type="button" className="secondary">
-              Edit Teams
+              {t('components.designPreview.editTeams')}
             </button>
           </div>
         </section>
@@ -77,16 +78,16 @@ export default function DesignPreview() {
 
       <section className="preview-card preview-card-yellow preview-board-wrap">
         <div className="preview-card-head">
-          <h3>Play View Mockup</h3>
-          <span className="preview-tag">Live Game</span>
+          <h3>{t('components.designPreview.playViewTitle')}</h3>
+          <span className="preview-tag">{t('components.designPreview.liveGameTag')}</span>
         </div>
         <div className="preview-play-top">
           <div className="preview-turn-banner">
-            <span>Now answering</span>
+            <span>{t('components.designPreview.nowAnswering')}</span>
             <strong>Team A</strong>
           </div>
           <div className="preview-scoreboard">
-            <div className="preview-score-title">Scoreboard</div>
+            <div className="preview-score-title">{t('components.designPreview.scoreboard')}</div>
             <ul>
               <li className="is-current">
                 <span>Team A</span>
@@ -128,25 +129,25 @@ export default function DesignPreview() {
         </div>
       </section>
 
-      <section className="preview-modal-demo" aria-label="Clue modal preview">
+      <section className="preview-modal-demo" aria-label={t('components.designPreview.questionTitle')}>
         <div className="preview-modal-card">
           <div className="preview-modal-top">
-            <span className="preview-pill preview-pill-green">Team A&apos;s Turn</span>
-            <span className="preview-pill preview-pill-yellow">300 points</span>
+            <span className="preview-pill preview-pill-green">{t('components.designPreview.teamTurnPill')}</span>
+            <span className="preview-pill preview-pill-yellow">{t('components.designPreview.pointsPill')}</span>
           </div>
-          <h3>Question</h3>
+          <h3>{t('components.designPreview.questionTitle')}</h3>
           <p className="preview-question">This planet is known as the Red Planet.</p>
           <label>
-            Team answer
+            {t('components.designPreview.teamAnswerLabel')}
             <input type="text" value="mars" readOnly />
           </label>
           <div className="preview-actions">
-            <button type="button">Submit Answer</button>
+            <button type="button">{t('components.designPreview.submitAnswer')}</button>
             <button type="button" className="secondary">
-              Close
+              {t('common.close')}
             </button>
           </div>
-          <p className="preview-feedback success">Correct! +300 points</p>
+          <p className="preview-feedback success">{t('components.designPreview.feedbackCorrect')}</p>
         </div>
       </section>
     </section>

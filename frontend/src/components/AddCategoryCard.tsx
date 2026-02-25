@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import InfoHint from './InfoHint'
 
 const MAX_CLUE_IMAGE_BYTES = 1_048_576
@@ -69,6 +70,7 @@ const defaultQuestion: QuestionDraft = {
 const allowedValues = [100, 200, 300, 400, 500]
 
 export default function AddCategoryCard(props: AddCategoryCardProps) {
+  const { t } = useTranslation()
   const {
     categoryName,
     categoryOrder,
@@ -131,13 +133,13 @@ export default function AddCategoryCard(props: AddCategoryCardProps) {
 
     if (!ALLOWED_IMAGE_TYPES.includes(file.type as (typeof ALLOWED_IMAGE_TYPES)[number])) {
       setCurrentQuestion((previous) => ({ ...previous, image: null }))
-      setImageError('Only PNG, JPG/JPEG, and GIF images are allowed.')
+      setImageError(t('components.addCategoryCard.imageFileTypeError'))
       return
     }
 
     if (file.size > MAX_CLUE_IMAGE_BYTES) {
       setCurrentQuestion((previous) => ({ ...previous, image: null }))
-      setImageError(`Image is too large. Max size is ${formatBytes(MAX_CLUE_IMAGE_BYTES)}.`)
+      setImageError(t('components.addCategoryCard.imageTooLarge', { maxSize: formatBytes(MAX_CLUE_IMAGE_BYTES) }))
       return
     }
 
@@ -145,7 +147,7 @@ export default function AddCategoryCard(props: AddCategoryCardProps) {
       const previewUrl = await readFileAsDataUrl(file)
       const commaIndex = previewUrl.indexOf(',')
       if (commaIndex < 0) {
-        throw new Error('Invalid image data')
+        throw new Error(t('components.addCategoryCard.invalidImageData'))
       }
 
       setCurrentQuestion((previous) => ({
@@ -161,27 +163,33 @@ export default function AddCategoryCard(props: AddCategoryCardProps) {
       setImageError('')
     } catch {
       setCurrentQuestion((previous) => ({ ...previous, image: null }))
-      setImageError('Could not read the selected image.')
+      setImageError(t('components.addCategoryCard.couldNotReadImage'))
     }
   }
 
   return (
     <section className={`card card-yellow ${isLocked ? 'card-disabled' : ''}`}>
-      <h2>Board Builder</h2>
-      <p className="muted">Create one category and add several questions, then save once.</p>
-      <p className="tiny muted">Typical setup: 5 categories with 5 questions each.</p>
-      {isEditingQuestion && <p className="tiny">Editing an existing question. Save changes below or cancel to return to add mode.</p>}
-      {isLocked && <p className="tiny section-lock-note">Board builder is disabled while the game is in progress.</p>}
+      <h2>{t('components.addCategoryCard.title')}</h2>
+      <p className="muted">{t('components.addCategoryCard.subtitle')}</p>
+      <p className="tiny muted">{t('components.addCategoryCard.setupHint')}</p>
+      {isEditingQuestion && <p className="tiny">{t('components.addCategoryCard.editingHint')}</p>}
+      {isLocked && <p className="tiny section-lock-note">{t('components.addCategoryCard.locked')}</p>}
 
       <div className="grid">
         <div className="field">
-          <label htmlFor="category-name">Category Name</label>
-          <input id="category-name" value={categoryName} onChange={(event) => onCategoryNameChange(event.target.value)} placeholder="Category name" disabled={isDisabled} />
+          <label htmlFor="category-name">{t('components.addCategoryCard.categoryNameLabel')}</label>
+          <input
+            id="category-name"
+            value={categoryName}
+            onChange={(event) => onCategoryNameChange(event.target.value)}
+            placeholder={t('components.addCategoryCard.categoryNamePlaceholder')}
+            disabled={isDisabled}
+          />
         </div>
         <div className="field">
           <div className="field-label-row">
-            <label htmlFor="category-order">Category Column</label>
-            <InfoHint text="Determines left-to-right column position on the board." label="Category column help" />
+            <label htmlFor="category-order">{t('components.addCategoryCard.categoryOrderLabel')}</label>
+            <InfoHint text={t('components.addCategoryCard.categoryOrderHelp')} label={t('components.addCategoryCard.categoryOrderHelpLabel')} />
           </div>
           <input
             id="category-order"
@@ -190,34 +198,34 @@ export default function AddCategoryCard(props: AddCategoryCardProps) {
             min={1}
             disabled={isDisabled}
             onChange={(event) => onCategoryOrderChange(Number(event.target.value))}
-            placeholder="1 = first column"
+            placeholder={t('components.addCategoryCard.categoryOrderPlaceholder')}
           />
         </div>
       </div>
 
       <div className="grid">
         <div className="field">
-          <label htmlFor="clue-prompt">Question Text</label>
+          <label htmlFor="clue-prompt">{t('components.addCategoryCard.questionTextLabel')}</label>
           <input
             id="clue-prompt"
             value={currentQuestion.prompt}
             disabled={isDisabled}
             onChange={(event) => setCurrentQuestion((prev) => ({ ...prev, prompt: event.target.value }))}
-            placeholder="Question text shown to players"
+            placeholder={t('components.addCategoryCard.questionTextPlaceholder')}
           />
         </div>
         <div className="field">
-          <label htmlFor="clue-answer">Expected Answer</label>
+          <label htmlFor="clue-answer">{t('components.addCategoryCard.expectedAnswerLabel')}</label>
           <input
             id="clue-answer"
             value={currentQuestion.answer}
             disabled={isDisabled}
             onChange={(event) => setCurrentQuestion((prev) => ({ ...prev, answer: event.target.value }))}
-            placeholder="Expected answer"
+            placeholder={t('components.addCategoryCard.expectedAnswerPlaceholder')}
           />
         </div>
         <div className="field">
-          <label htmlFor="clue-points">Question Value</label>
+          <label htmlFor="clue-points">{t('components.addCategoryCard.questionValueLabel')}</label>
           <select
             id="clue-points"
             value={currentQuestion.pointValue}
@@ -230,10 +238,10 @@ export default function AddCategoryCard(props: AddCategoryCardProps) {
               </option>
             ))}
           </select>
-          <div className="tiny muted">Only one question per value in this category.</div>
+          <div className="tiny muted">{t('components.addCategoryCard.onePerValue')}</div>
         </div>
         <div className="field">
-          <label htmlFor="clue-image">Question Image (Optional)</label>
+          <label htmlFor="clue-image">{t('components.addCategoryCard.questionImageLabel')}</label>
           <input
             id="clue-image"
             type="file"
@@ -244,11 +252,11 @@ export default function AddCategoryCard(props: AddCategoryCardProps) {
               event.currentTarget.value = ''
             }}
           />
-          <div className="tiny muted">PNG, JPG/JPEG, or GIF. Max {formatBytes(MAX_CLUE_IMAGE_BYTES)}.</div>
+          <div className="tiny muted">{t('components.addCategoryCard.questionImageHelp', { maxSize: formatBytes(MAX_CLUE_IMAGE_BYTES) })}</div>
           {imageError && <div className="tiny inline-error">{imageError}</div>}
           {currentQuestion.image && (
             <div className="clue-image-preview">
-              <img src={currentQuestion.image.previewUrl} alt={`Preview for ${currentQuestion.image.fileName}`} />
+              <img src={currentQuestion.image.previewUrl} alt={t('components.addCategoryCard.previewAlt', { fileName: currentQuestion.image.fileName })} />
               <div className="tiny muted">
                 {currentQuestion.image.fileName} ({formatBytes(currentQuestion.image.sizeBytes)})
               </div>
@@ -261,7 +269,7 @@ export default function AddCategoryCard(props: AddCategoryCardProps) {
                   setImageError('')
                 }}
               >
-                Remove Image
+                {t('components.addCategoryCard.removeImage')}
               </button>
             </div>
           )}
@@ -297,7 +305,7 @@ export default function AddCategoryCard(props: AddCategoryCardProps) {
                 setImageError('')
               }}
             >
-              Save Edited Question
+              {t('components.addCategoryCard.saveEditedQuestion')}
             </button>
             <button
               className="btn-secondary"
@@ -309,7 +317,7 @@ export default function AddCategoryCard(props: AddCategoryCardProps) {
                 onCancelEditQuestion?.()
               }}
             >
-              Cancel Edit
+              {t('components.addCategoryCard.cancelEdit')}
             </button>
           </>
         ) : (
@@ -320,25 +328,25 @@ export default function AddCategoryCard(props: AddCategoryCardProps) {
               type="button"
               onClick={addQuestionToCategory}
             >
-              Add Question To Category
+              {t('components.addCategoryCard.addQuestionToCategory')}
             </button>
-            {hasDuplicateValue && <span className="tiny inline-error">This value is already used in this category.</span>}
+            {hasDuplicateValue && <span className="tiny inline-error">{t('components.addCategoryCard.duplicateValue')}</span>}
           </>
         )}
       </div>
 
       {questions.length > 0 && (
         <>
-          <p className="muted">Questions queued for this category:</p>
+          <p className="muted">{t('components.addCategoryCard.queuedQuestions')}</p>
           <ul className="list compact-list">
             {questions.map((question, index) => (
               <li key={`${question.pointValue}-${index}`} className="row">
                 <div>
-                  {question.pointValue} pts - {question.prompt}
-                  {question.image ? ' (image)' : ''}
+                  {question.pointValue} {t('common.pointsShort')} - {question.prompt}
+                  {question.image ? ` ${t('components.boardCard.imageTag')}` : ''}
                 </div>
                 <button className="btn-secondary" type="button" disabled={isDisabled} onClick={() => removeQuestion(index)}>
-                  Remove
+                  {t('common.remove')}
                 </button>
               </li>
             ))}
@@ -363,7 +371,7 @@ export default function AddCategoryCard(props: AddCategoryCardProps) {
             setQuestions([])
           }}
         >
-          Save Category With {questions.length} Question{questions.length === 1 ? '' : 's'}
+          {t('components.addCategoryCard.saveCategoryWithCount', { count: questions.length })}
         </button>
       </div>
     </section>

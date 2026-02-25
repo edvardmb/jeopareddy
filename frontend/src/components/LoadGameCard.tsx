@@ -1,5 +1,7 @@
 import { GameListItem } from '../api'
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { translateGameStatus } from '../i18nHelpers'
 
 type LoadGameCardProps = {
   gameIdInput: string
@@ -12,6 +14,7 @@ type LoadGameCardProps = {
 }
 
 export default function LoadGameCard(props: LoadGameCardProps) {
+  const { t } = useTranslation()
   const { gameIdInput, isBusy, games, onGameIdChange, onLoad, onRefresh, onLoadFromList } = props
   const [selectedGameId, setSelectedGameId] = useState('')
 
@@ -23,39 +26,44 @@ export default function LoadGameCard(props: LoadGameCardProps) {
 
   return (
     <section className="card card-sky">
-      <h2>2. Load Existing Game</h2>
-      <p className="muted">Paste a game ID to continue editing or hosting.</p>
+      <h2>{t('components.loadGameCard.title')}</h2>
+      <p className="muted">{t('components.loadGameCard.subtitle')}</p>
       <div className="row">
         <div className="field">
-          <label htmlFor="load-game-id">Game ID</label>
-          <input id="load-game-id" value={gameIdInput} onChange={(event) => onGameIdChange(event.target.value)} placeholder="Game ID" />
+          <label htmlFor="load-game-id">{t('components.loadGameCard.gameIdLabel')}</label>
+          <input
+            id="load-game-id"
+            value={gameIdInput}
+            onChange={(event) => onGameIdChange(event.target.value)}
+            placeholder={t('components.loadGameCard.gameIdPlaceholder')}
+          />
         </div>
         <button className="btn-primary" disabled={isBusy || !gameIdInput} onClick={onLoad}>
-          Load Game
+          {t('components.loadGameCard.loadGame')}
         </button>
         <button className="btn-secondary" disabled={isBusy} onClick={onRefresh}>
-          Refresh List
+          {t('components.loadGameCard.refreshList')}
         </button>
       </div>
 
-      <div className="inline-note">Or choose one below:</div>
+      <div className="inline-note">{t('components.loadGameCard.orChoose')}</div>
       {games.length === 0 ? (
-        <p className="muted">No games found yet.</p>
+        <p className="muted">{t('components.loadGameCard.noGames')}</p>
       ) : (
         <div className="row">
           <div className="field">
-            <label htmlFor="game-dropdown">Available Games</label>
+            <label htmlFor="game-dropdown">{t('components.loadGameCard.availableGames')}</label>
             <select id="game-dropdown" value={selectedGameId} onChange={(event) => setSelectedGameId(event.target.value)}>
               {games.map((game) => (
                 <option key={game.id} value={game.id}>
-                  {game.title} ({game.status})
+                  {game.title} ({translateGameStatus(game.status, t)})
                 </option>
               ))}
             </select>
-            <div className="tiny muted">Choose a game and click load.</div>
+            <div className="tiny muted">{t('components.loadGameCard.chooseAndLoad')}</div>
           </div>
           <button className="btn-primary" disabled={isBusy || !selectedGameId} onClick={() => onLoadFromList(selectedGameId)}>
-            Load Selected
+            {t('components.loadGameCard.loadSelected')}
           </button>
         </div>
       )}

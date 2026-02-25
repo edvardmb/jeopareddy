@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import type { TFunction } from 'i18next'
+import { useTranslation } from 'react-i18next'
 import { Clue, Game } from '../api'
 import jokerHatUrl from '../assets/joker-hat.svg'
 import genderRevealSongUrl from '../assets/reveal.mp3'
@@ -73,10 +75,12 @@ const GENDER_REVEAL_REVEAL_DELAY_MS = 10500
 const GENDER_REVEAL_AUDIO_FADE_MS = 3000
 
 export default function PlayModeView(props: PlayModeViewProps) {
+  const { t } = useTranslation()
   const { game, isBusy, currentTeamId, onCurrentTeamIdChange, jokerConfig, genderRevealConfig, onResolveQuestion } = props
   const [activeClue, setActiveClue] = useState<Clue | null>(null)
   const [answerInput, setAnswerInput] = useState('')
   const [feedback, setFeedback] = useState('')
+  const [feedbackTone, setFeedbackTone] = useState<'success' | 'error' | ''>('')
   const [hasSubmitted, setHasSubmitted] = useState(false)
   const [jokerRound, setJokerRound] = useState<JokerRoundState | null>(null)
   const [genderRevealRound, setGenderRevealRound] = useState<GenderRevealRoundState | null>(null)
@@ -207,6 +211,7 @@ export default function PlayModeView(props: PlayModeViewProps) {
     setIsQuestionRevealTransitioning(false)
     setAnswerInput('')
     setFeedback('')
+    setFeedbackTone('')
     setHasSubmitted(false)
   }
 
@@ -241,7 +246,7 @@ export default function PlayModeView(props: PlayModeViewProps) {
       void audio.play().catch(() => {
         setGenderRevealRound((current) =>
           current && current.status === 'animating'
-            ? { ...current, bonusMessage: 'Audio could not autoplay. Continue with the reveal.' }
+            ? { ...current, bonusMessage: t('components.playModeView.audioAutoplayError') }
             : current,
         )
       })
@@ -276,8 +281,8 @@ export default function PlayModeView(props: PlayModeViewProps) {
           isCorrect,
           bonusStatus: isCorrect ? 'awarded' : 'missed',
           bonusMessage: isCorrect
-            ? `Correct guess! +${GENDER_REVEAL_BONUS_POINTS} points added to this clue's value.`
-            : 'No points lost for a wrong guess.',
+            ? t('components.playModeView.correctGuessBonus', { points: GENDER_REVEAL_BONUS_POINTS })
+            : t('components.playModeView.wrongGuessNoPenalty'),
         }
       })
 
@@ -325,19 +330,19 @@ export default function PlayModeView(props: PlayModeViewProps) {
   if (game.categories.length === 0) {
     return (
       <section className="card card-play">
-        <h2>Play Mode</h2>
-        <p className="muted">Add categories and questions first.</p>
+        <h2>{t('components.playModeView.title')}</h2>
+        <p className="muted">{t('components.playModeView.emptyState')}</p>
       </section>
     )
   }
 
   return (
     <section className="card card-play">
-      <h2>Play Mode</h2>
-      <p className="muted">Select a card, read the question, submit an answer, and score automatically.</p>
+      <h2>{t('components.playModeView.title')}</h2>
+      <p className="muted">{t('components.playModeView.subtitle')}</p>
       {currentTeam && (
         <p className="turn-indicator">
-          Turn: <strong>{currentTeam.name}</strong>
+          {t('components.playModeView.turnIndicator')}: <strong>{currentTeam.name}</strong>
         </p>
       )}
 
@@ -382,6 +387,7 @@ export default function PlayModeView(props: PlayModeViewProps) {
                     setIsQuestionRevealTransitioning(false)
                     setAnswerInput('')
                     setFeedback('')
+                    setFeedbackTone('')
                     setHasSubmitted(false)
                   }}
                 >
@@ -395,9 +401,9 @@ export default function PlayModeView(props: PlayModeViewProps) {
 
       {activeClue && genderRevealRound && (
         <MiniGameModal
-          title="Gender Reveal"
-          subtitle={`Team ${currentTeam?.name ?? ''}: make your guess before the reveal drops`}
-          closeLabel={genderRevealRound.status === 'revealed' ? 'Close' : 'Cancel'}
+          title={t('components.playModeView.genderRevealTitle')}
+          subtitle={t('components.playModeView.genderRevealSubtitle', { teamName: currentTeam?.name ?? '' })}
+          closeLabel={genderRevealRound.status === 'revealed' ? t('components.playModeView.close') : t('components.playModeView.cancel')}
           onClose={() => {
             resetActiveQuestionFlow()
           }}
@@ -405,15 +411,15 @@ export default function PlayModeView(props: PlayModeViewProps) {
           <div
             className={`gender-reveal-stage ${genderRevealRound.status} ${genderRevealRound.status === 'revealed' ? `result-${genderRevealRound.actualGender}` : ''}`}
           >
-            <div className="gender-reveal-halves" aria-label="Pick boy or girl">
+            <div className="gender-reveal-halves" aria-label={t('components.playModeView.pickBoyOrGirl')}>
               <button
                 type="button"
                 className={`gender-half girl ${genderRevealRound.guessedGender === 'girl' ? 'selected' : ''}`}
                 disabled={genderRevealRound.status !== 'guessing' || isBusy}
                 onClick={() => handleGenderGuess('girl')}
               >
-                <span className="gender-half-label">Girl</span>
-                <span className="gender-half-subtitle">Pink side</span>
+                <span className="gender-half-label">{t('components.playModeView.girl')}</span>
+                <span className="gender-half-subtitle">{t('components.playModeView.girlSide')}</span>
               </button>
 
               <button
@@ -422,8 +428,8 @@ export default function PlayModeView(props: PlayModeViewProps) {
                 disabled={genderRevealRound.status !== 'guessing' || isBusy}
                 onClick={() => handleGenderGuess('boy')}
               >
-                <span className="gender-half-label">Boy</span>
-                <span className="gender-half-subtitle">Blue side</span>
+                <span className="gender-half-label">{t('components.playModeView.boy')}</span>
+                <span className="gender-half-subtitle">{t('components.playModeView.boySide')}</span>
               </button>
 
               <div
@@ -439,7 +445,7 @@ export default function PlayModeView(props: PlayModeViewProps) {
 
             {genderRevealRound.status === 'revealed' && (
               <div className="gender-reveal-result-wrap">
-                <p className={`gender-reveal-banner ${genderRevealRound.isCorrect ? 'correct' : 'miss'}`}>It&apos;s a boy!</p>
+                <p className={`gender-reveal-banner ${genderRevealRound.isCorrect ? 'correct' : 'miss'}`}>{t('components.playModeView.itsABoy')}</p>
                   <p className="gender-reveal-bonus-note">{genderRevealRound.bonusMessage}</p>
                 <button
                   type="button"
@@ -449,7 +455,7 @@ export default function PlayModeView(props: PlayModeViewProps) {
                     setGenderRevealRound(null)
                   }}
                 >
-                  Continue
+                  {t('common.continue')}
                 </button>
               </div>
             )}
@@ -492,23 +498,23 @@ export default function PlayModeView(props: PlayModeViewProps) {
 
       {activeClue && jokerRound && (jokerIsActive || isJokerResultHolding) && (
         <MiniGameModal
-          title="Joker Mini-Game"
-          subtitle={`Team ${currentTeam?.name ?? ''}: complete Joker before the clue is revealed`}
-          headerVisual={<img className="joker-hat-logo" src={jokerHatUrl} alt="Joker hat" />}
-          closeLabel="Cancel"
+          title={t('components.playModeView.jokerTitle')}
+          subtitle={t('components.playModeView.jokerSubtitle', { teamName: currentTeam?.name ?? '' })}
+          headerVisual={<img className="joker-hat-logo" src={jokerHatUrl} alt={t('components.playModeView.jokerHatAlt')} />}
+          closeLabel={t('components.playModeView.cancel')}
           onClose={() => {
             resetActiveQuestionFlow()
           }}
         >
           <div className="joker-stage">
             <div className="joker-ladder-panel">
-              <div className="joker-ladder" aria-label="Joker prize ladder">
+              <div className="joker-ladder" aria-label={t('components.playModeView.jokerPrizeLadderAria')}>
                 {getLadderValues(activeClue.pointValue).map((points, index) => {
                   const rung = JOKER_STEP_COUNT - index
                   const isActiveRung = !jokerRound.thiefHit && getCurrentJokerRungForDisplay(jokerRound) === rung
                   return (
                     <div key={points} className={`joker-ladder-rung ${isActiveRung ? 'active' : ''}`}>
-                      {points} pts
+                      {points} {t('common.pointsShort')}
                     </div>
                   )
                 })}
@@ -530,11 +536,11 @@ export default function PlayModeView(props: PlayModeViewProps) {
                         disabled={!canClick}
                         onClick={() => setJokerRound((current) => applyJokerChoice(current, 'up', activeClue.pointValue))}
                       >
-                        <span className="joker-orb-label">UP</span>
-                        <span className="joker-orb-value">{step.choice === 'up' && step.revealedSpot ? renderJokerSpot(step.revealedSpot) : ''}</span>
+                        <span className="joker-orb-label">{t('components.playModeView.up')}</span>
+                        <span className="joker-orb-value">{step.choice === 'up' && step.revealedSpot ? renderJokerSpot(step.revealedSpot, t) : ''}</span>
                       </button>
 
-                      <div className="joker-base-orb" aria-label={`Base digit ${step.baseDigit}`}>
+                      <div className="joker-base-orb" aria-label={t('components.playModeView.baseDigitAria', { digit: step.baseDigit })}>
                         {step.baseDigit}
                       </div>
 
@@ -544,8 +550,8 @@ export default function PlayModeView(props: PlayModeViewProps) {
                         disabled={!canClick}
                         onClick={() => setJokerRound((current) => applyJokerChoice(current, 'down', activeClue.pointValue))}
                       >
-                        <span className="joker-orb-label">DOWN</span>
-                        <span className="joker-orb-value">{step.choice === 'down' && step.revealedSpot ? renderJokerSpot(step.revealedSpot) : ''}</span>
+                        <span className="joker-orb-label">{t('components.playModeView.down')}</span>
+                        <span className="joker-orb-value">{step.choice === 'down' && step.revealedSpot ? renderJokerSpot(step.revealedSpot, t) : ''}</span>
                       </button>
 
                     </div>
@@ -561,8 +567,8 @@ export default function PlayModeView(props: PlayModeViewProps) {
         <div className="question-reveal-backdrop" aria-hidden="true">
           <div className="question-reveal-stage">
             <div className="question-reveal-flash" />
-            <div className="question-reveal-burst-text">QUESTION TIME</div>
-            <div className="question-reveal-subtext">{resolvedPointValue} points</div>
+            <div className="question-reveal-burst-text">{t('components.playModeView.questionTime')}</div>
+            <div className="question-reveal-subtext">{t('components.playModeView.pointsLabel', { points: resolvedPointValue })}</div>
             <div className="question-reveal-curtain left" />
             <div className="question-reveal-curtain right" />
           </div>
@@ -578,37 +584,37 @@ export default function PlayModeView(props: PlayModeViewProps) {
             aria-labelledby="play-modal-title"
           >
             <h3 id="play-modal-title">
-              Question for {resolvedPointValue} points
-              {genderRevealBonusPointsForClue > 0 ? ` (includes +${genderRevealBonusPointsForClue} reveal bonus)` : ''}
+              {t('components.playModeView.questionForPoints', { points: resolvedPointValue })}
+              {genderRevealBonusPointsForClue > 0 ? ` ${t('components.playModeView.includesRevealBonus', { points: genderRevealBonusPointsForClue })}` : ''}
             </h3>
             {jokerRound?.status === 'completed' && (
               <p className={`message ${jokerRound.thiefHit ? 'error' : 'success'}`}>
                 {jokerRound.thiefHit
-                  ? 'Thief hit: this question is now worth 10 points.'
+                  ? t('components.playModeView.thiefHitResult')
                   : jokerRound.jokerHit
-                    ? 'Joker hit: top prize reached!'
-                    : `Joker complete: question value set to ${resolvedPointValue} points.`}
+                    ? t('components.playModeView.jokerHitResult')
+                    : t('components.playModeView.jokerCompleteResult', { points: resolvedPointValue })}
               </p>
             )}
 
             {getClueImageSrc(activeClue) && (
               <div className="play-clue-image-wrap">
-                <img className="play-clue-image" src={getClueImageSrc(activeClue)!} alt="Question visual" />
+                <img className="play-clue-image" src={getClueImageSrc(activeClue)!} alt={t('components.playModeView.questionVisualAlt')} />
               </div>
             )}
             <p>{activeClue.prompt}</p>
 
             <p>
-              Current team: <strong>{currentTeam?.name ?? 'None'}</strong>
+              {t('components.playModeView.currentTeamLabel')}: <strong>{currentTeam?.name ?? t('components.playModeView.noneTeam')}</strong>
             </p>
 
             <div className="field">
-              <label htmlFor="play-answer">Answer</label>
+              <label htmlFor="play-answer">{t('components.playModeView.answerLabel')}</label>
               <input
                 id="play-answer"
                 value={answerInput}
                 onChange={(event) => setAnswerInput(event.target.value)}
-                placeholder="Type answer"
+                placeholder={t('components.playModeView.typeAnswerPlaceholder')}
                 autoComplete="off"
                 autoCorrect="off"
                 autoCapitalize="off"
@@ -625,10 +631,14 @@ export default function PlayModeView(props: PlayModeViewProps) {
                   setFeedback(
                     isCorrect
                       ? genderRevealBonusPointsForClue > 0
-                        ? `Correct answer! ${resolvedPointValue} total points (includes +${genderRevealBonusPointsForClue} reveal bonus).`
-                        : 'Correct answer!'
-                      : `Wrong. Correct answer: ${activeClue.answer}`,
+                        ? t('components.playModeView.correctAnswerWithBonusFeedback', {
+                            points: resolvedPointValue,
+                            bonus: genderRevealBonusPointsForClue,
+                          })
+                        : t('components.playModeView.correctAnswerFeedback')
+                      : t('components.playModeView.wrongAnswerFeedback', { answer: activeClue.answer }),
                   )
+                  setFeedbackTone(isCorrect ? 'success' : 'error')
                   setHasSubmitted(true)
                   await onResolveQuestion({
                     clue: activeClue,
@@ -644,7 +654,7 @@ export default function PlayModeView(props: PlayModeViewProps) {
                   }
                 }}
               >
-                Submit Answer
+                {t('components.playModeView.submitAnswer')}
               </button>
               <button
                 className="btn-secondary"
@@ -654,12 +664,12 @@ export default function PlayModeView(props: PlayModeViewProps) {
                   resetActiveQuestionFlow()
                 }}
               >
-                Close
+                {t('components.playModeView.close')}
               </button>
             </div>
 
             {feedback && (
-              <p className={`message ${feedback.startsWith('Correct') ? 'success' : 'error'}`} aria-live="polite">
+              <p className={`message ${feedbackTone}`} aria-live="polite">
                 {feedback}
               </p>
             )}
@@ -669,13 +679,13 @@ export default function PlayModeView(props: PlayModeViewProps) {
 
       {scoreOrderedTeams.length > 0 && (
         <>
-          <h3>Current Scores</h3>
+          <h3>{t('components.playModeView.currentScores')}</h3>
           <ul className="list compact-list">
             {scoreOrderedTeams.map((team) => (
               <li key={team.id} className={`row ${team.id === currentTeamId ? 'current-turn' : ''}`}>
                 <strong>{team.name}</strong>
                 <span>
-                  {team.score} pts{team.id === currentTeamId ? ' (turn)' : ''}
+                  {team.score} {t('common.pointsShort')}{team.id === currentTeamId ? ` ${t('components.playModeView.turnSuffix')}` : ''}
                 </span>
               </li>
             ))}
@@ -852,12 +862,12 @@ function describeJokerOutcome(outcome: JokerOutcome | null): string {
   }
 }
 
-function renderJokerSpot(spot: JokerSpot): string {
+function renderJokerSpot(spot: JokerSpot, t: TFunction): string {
   if (spot.kind === 'number') {
     return String(spot.value)
   }
 
-  return spot.kind === 'joker' ? 'JOKER' : 'THIEF'
+  return spot.kind === 'joker' ? t('components.playModeView.jokerWord') : t('components.playModeView.thiefWord')
 }
 
 function getJokerOutcomeClass(outcome: JokerOutcome | null): string {

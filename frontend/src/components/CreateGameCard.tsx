@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next'
+
 type CreateGameCardProps = {
   gameTitle: string
   isBusy: boolean
@@ -6,24 +8,25 @@ type CreateGameCardProps = {
 }
 
 export default function CreateGameCard(props: CreateGameCardProps) {
+  const { t } = useTranslation()
   const { gameTitle, isBusy, onGameTitleChange, onCreate } = props
 
   return (
     <section className="card card-blue">
-      <h2>1. Create A New Game</h2>
-      <p className="muted">Start from scratch with a fresh game board.</p>
+      <h2>{t('components.createGameCard.title')}</h2>
+      <p className="muted">{t('components.createGameCard.subtitle')}</p>
       <div className="row">
         <div className="field">
-          <label htmlFor="create-game-title">Game Title</label>
+          <label htmlFor="create-game-title">{t('components.createGameCard.gameTitleLabel')}</label>
           <input
             id="create-game-title"
             value={gameTitle}
             onChange={(event) => onGameTitleChange(event.target.value)}
-            placeholder="Example: Friday Trivia Night"
+            placeholder={t('components.createGameCard.gameTitlePlaceholder')}
           />
         </div>
         <button className="btn-primary" disabled={isBusy} onClick={onCreate}>
-          Create Game
+          {t('components.createGameCard.createButton')}
         </button>
       </div>
     </section>

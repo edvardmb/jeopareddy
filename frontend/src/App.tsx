@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   API_BASE_URL,
   addCategory,
@@ -7,6 +7,7 @@ import {
   createScoreEvent,
   deleteCategory,
   deleteClue,
+  deleteTeam,
   Game,
   GameListItem,
   getGame,
@@ -40,6 +41,7 @@ function App() {
   const [categoryName, setCategoryName] = useState('Science')
   const [categoryOrder, setCategoryOrder] = useState(1)
   const [scoreTeamId, setScoreTeamId] = useState('')
+  const [currentTurnTeamId, setCurrentTurnTeamId] = useState('')
   const [scoreDelta, setScoreDelta] = useState(100)
   const [scoreReason, setScoreReason] = useState('Correct answer')
   const [isBusy, setIsBusy] = useState(false)
@@ -49,14 +51,24 @@ function App() {
   const [jokerEnabled, setJokerEnabled] = useState(false)
   const [jokerAppearancesPerGame, setJokerAppearancesPerGame] = useState(1)
   const [jokerAssignedClueIds, setJokerAssignedClueIds] = useState<string[]>([])
+  const [jokerSpotCount, setJokerSpotCount] = useState(1)
+  const [thiefSpotCount, setThiefSpotCount] = useState(1)
+  const [genderRevealEnabled, setGenderRevealEnabled] = useState(false)
+  const [genderRevealAppearancesPerGame, setGenderRevealAppearancesPerGame] = useState(1)
+  const [genderRevealAssignedClueIds, setGenderRevealAssignedClueIds] = useState<string[]>([])
   const [editingQuestion, setEditingQuestion] = useState<{ clueId: string; question: QuestionDraft } | null>(null)
 
   const canOperateOnGame = Boolean(loadedGame?.id)
   const isSetupLocked = loadedGame?.status === 'InProgress'
   const scoreTeams = useMemo(() => loadedGame?.teams ?? [], [loadedGame])
+  const loadGameRequestSeqRef = useRef(0)
 
   const loadGame = async (gameId: string) => {
+    const requestSeq = ++loadGameRequestSeqRef.current
     const game = await getGame(gameId)
+    if (requestSeq !== loadGameRequestSeqRef.current) {
+      return
+    }
     setLoadedGame(game)
     setGameIdInput(game.id)
     if (game.teams.length > 0) {
@@ -96,8 +108,28 @@ function App() {
   }, [loadedGame?.id])
 
   useEffect(() => {
+    setGenderRevealAssignedClueIds([])
+  }, [loadedGame?.id])
+
+  useEffect(() => {
     setEditingQuestion(null)
   }, [loadedGame?.id])
+
+  useEffect(() => {
+    if (!loadedGame || loadedGame.teams.length === 0) {
+      if (currentTurnTeamId) {
+        setCurrentTurnTeamId('')
+      }
+      return
+    }
+
+    if (!currentTurnTeamId || !loadedGame.teams.some((team) => team.id === currentTurnTeamId)) {
+      const firstTeam = [...loadedGame.teams].sort((a, b) => a.displayOrder - b.displayOrder)[0]
+      if (firstTeam) {
+        setCurrentTurnTeamId(firstTeam.id)
+      }
+    }
+  }, [currentTurnTeamId, loadedGame])
 
   useEffect(() => {
     if (!loadedGame)
@@ -151,6 +183,60 @@ function App() {
     }
   }, [jokerAssignedClueIds, jokerAppearancesPerGame, jokerEnabled, loadedGame])
 
+  useEffect(() => {
+    if (!loadedGame) {
+      if (genderRevealAssignedClueIds.length > 0) {
+        setGenderRevealAssignedClueIds([])
+      }
+      return
+    }
+
+    if (!genderRevealEnabled) {
+      if (genderRevealAssignedClueIds.length > 0) {
+        setGenderRevealAssignedClueIds([])
+      }
+      return
+    }
+
+    const excludedClueIdSet = new Set(jokerAssignedClueIds)
+    const allEligibleClues = loadedGame.categories
+      .flatMap((category) => category.clues)
+      .filter((clue) => !excludedClueIdSet.has(clue.id))
+    const targetCount = Math.max(0, Math.min(Math.floor(genderRevealAppearancesPerGame || 0), allEligibleClues.length))
+    if (targetCount === 0) {
+      if (genderRevealAssignedClueIds.length > 0) {
+        setGenderRevealAssignedClueIds([])
+      }
+      return
+    }
+
+    const allClueIdSet = new Set(allEligibleClues.map((clue) => clue.id))
+    const answeredClueIdSet = new Set(allEligibleClues.filter((clue) => clue.isAnswered).map((clue) => clue.id))
+    const existingValid = genderRevealAssignedClueIds.filter((id) => allClueIdSet.has(id))
+    const completedAssignments = existingValid.filter((id) => answeredClueIdSet.has(id))
+    const pendingAssignments = existingValid.filter((id) => !answeredClueIdSet.has(id))
+
+    const nextAssignments: string[] = []
+    nextAssignments.push(...completedAssignments.slice(0, targetCount))
+
+    if (nextAssignments.length < targetCount) {
+      nextAssignments.push(...pendingAssignments.slice(0, targetCount - nextAssignments.length))
+    }
+
+    const chosenSet = new Set(nextAssignments)
+    if (nextAssignments.length < targetCount) {
+      const availableUnanswered = allEligibleClues
+        .filter((clue) => !clue.isAnswered && !chosenSet.has(clue.id))
+        .map((clue) => clue.id)
+
+      nextAssignments.push(...shuffle(availableUnanswered).slice(0, targetCount - nextAssignments.length))
+    }
+
+    if (!sameStringSet(genderRevealAssignedClueIds, nextAssignments)) {
+      setGenderRevealAssignedClueIds(nextAssignments)
+    }
+  }, [genderRevealAssignedClueIds, genderRevealAppearancesPerGame, genderRevealEnabled, jokerAssignedClueIds, loadedGame])
+
   const jokerStats = useMemo(() => {
     if (!loadedGame) {
       return { totalAssigned: 0, completed: 0, remaining: 0 }
@@ -167,6 +253,23 @@ function App() {
       remaining: Math.max(0, totalAssigned - completed),
     }
   }, [jokerAssignedClueIds, loadedGame])
+
+  const genderRevealStats = useMemo(() => {
+    if (!loadedGame) {
+      return { totalAssigned: 0, completed: 0, remaining: 0 }
+    }
+
+    const answeredClueIds = new Set(
+      loadedGame.categories.flatMap((category) => category.clues.filter((clue) => clue.isAnswered).map((clue) => clue.id)),
+    )
+    const completed = genderRevealAssignedClueIds.filter((id) => answeredClueIds.has(id)).length
+    const totalAssigned = genderRevealAssignedClueIds.length
+    return {
+      totalAssigned,
+      completed,
+      remaining: Math.max(0, totalAssigned - completed),
+    }
+  }, [genderRevealAssignedClueIds, loadedGame])
 
   return (
     <main className="page">
@@ -301,6 +404,7 @@ function App() {
                 withBusy(async () => {
                   await resetGame(loadedGame.id)
                   setJokerAssignedClueIds([])
+                  setGenderRevealAssignedClueIds([])
                   await loadGame(loadedGame.id)
                   setMessage('Game reset to Draft with cleared scores and clues')
                   setMessageTone('success')
@@ -383,16 +487,105 @@ function App() {
                     onChange={(event) => setJokerAppearancesPerGame(Math.max(0, Number(event.target.value) || 0))}
                   />
                 </div>
+                <div className="field">
+                  <div className="field-label-row">
+                    <label htmlFor="joker-spot-count">Joker Spots (of 10)</label>
+                    <InfoHint text="Increase to make JOKER more likely in the mini-game." label="Joker spots help" />
+                  </div>
+                  <input
+                    id="joker-spot-count"
+                    type="number"
+                    min={0}
+                    max={10}
+                    disabled={isBusy || !loadedGame || isSetupLocked}
+                    value={jokerSpotCount}
+                    onChange={(event) => setJokerSpotCount(Math.max(0, Math.min(10, Number(event.target.value) || 0)))}
+                  />
+                </div>
+                <div className="field">
+                  <div className="field-label-row">
+                    <label htmlFor="thief-spot-count">Thief Spots (of 10)</label>
+                    <InfoHint text="Increase to make THIEF more likely in the mini-game." label="Thief spots help" />
+                  </div>
+                  <input
+                    id="thief-spot-count"
+                    type="number"
+                    min={0}
+                    max={10}
+                    disabled={isBusy || !loadedGame || isSetupLocked}
+                    value={thiefSpotCount}
+                    onChange={(event) => setThiefSpotCount(Math.max(0, Math.min(10, Number(event.target.value) || 0)))}
+                  />
+                </div>
               </div>
+              <p className="tiny muted">10 hidden spots per Joker game. If Joker + Thief spots exceed 10, Thief spots are capped.</p>
               <p className="tiny muted">
                 Assigned this game: {jokerStats.totalAssigned} • Triggered: {jokerStats.completed} • Remaining: {jokerStats.remaining}
               </p>
               <p className="tiny muted">These settings are local to the current host session (not saved in the backend yet).</p>
             </section>
+
+            <section className={`card card-sky ${isSetupLocked ? 'card-disabled' : ''}`}>
+              <h2>Gender Reveal Mini-Game</h2>
+              <p className="muted">Split pink/blue reveal modal. Correct guess awards +50 bonus points, wrong guess costs nothing.</p>
+              <div className="grid">
+                <div className="field">
+                  <label>Include Gender Reveal In Game</label>
+                  <button
+                    type="button"
+                    className={genderRevealEnabled ? 'btn-success' : 'btn-secondary'}
+                    disabled={isBusy || !loadedGame || isSetupLocked}
+                    onClick={() => setGenderRevealEnabled((value) => !value)}
+                  >
+                    {genderRevealEnabled ? 'Enabled' : 'Disabled'}
+                  </button>
+                </div>
+                <div className="field">
+                  <div className="field-label-row">
+                    <label htmlFor="gender-reveal-appearances">Appearances Per Game</label>
+                    <InfoHint
+                      text="How many clues will trigger the gender reveal minigame before the question appears. Joker assignments take priority if both are enabled."
+                      label="Gender reveal appearances help"
+                    />
+                  </div>
+                  <input
+                    id="gender-reveal-appearances"
+                    type="number"
+                    min={0}
+                    max={25}
+                    disabled={isBusy || !loadedGame || isSetupLocked}
+                    value={genderRevealAppearancesPerGame}
+                    onChange={(event) => setGenderRevealAppearancesPerGame(Math.max(0, Number(event.target.value) || 0))}
+                  />
+                </div>
+              </div>
+              <p className="tiny muted">
+                Assigned this game: {genderRevealStats.totalAssigned} • Triggered: {genderRevealStats.completed} • Remaining: {genderRevealStats.remaining}
+              </p>
+              <p className="tiny muted">Reveal outcome is currently set to boy for this event.</p>
+              <p className="tiny muted">These settings are local to the current host session (not saved in the backend yet).</p>
+            </section>
           </div>
 
           <div>
-            <TeamsCard teams={loadedGame.teams} />
+            <TeamsCard
+              teams={loadedGame.teams}
+              isDraft={loadedGame.status === 'Draft'}
+              isBusy={isBusy}
+              currentTurnTeamId={currentTurnTeamId}
+              onSetTurnTeamId={setCurrentTurnTeamId}
+              onDeleteTeam={(teamId) =>
+                withBusy(async () => {
+                  const team = loadedGame.teams.find((x) => x.id === teamId)
+                  await deleteTeam(loadedGame.id, teamId)
+                  await loadGame(loadedGame.id)
+                  setScoreTeamId((current) => (current === teamId ? '' : current))
+                  setCurrentTurnTeamId((current) => (current === teamId ? '' : current))
+                  setMessage(team ? `Team "${team.name}" removed` : 'Team removed')
+                  setMessageTone('success')
+                })
+              }
+            />
             <ScoreEventCard
               teams={scoreTeams}
               scoreTeamId={scoreTeamId}
@@ -481,9 +674,17 @@ function App() {
         <PlayModeView
           game={loadedGame}
           isBusy={isBusy}
+          currentTeamId={currentTurnTeamId}
+          onCurrentTeamIdChange={setCurrentTurnTeamId}
           jokerConfig={{
             enabled: jokerEnabled,
             assignedClueIds: jokerAssignedClueIds,
+            jokerSpotCount,
+            thiefSpotCount,
+          }}
+          genderRevealConfig={{
+            enabled: genderRevealEnabled,
+            assignedClueIds: genderRevealAssignedClueIds,
           }}
           onResolveQuestion={({ clue, teamId, isCorrect, resolvedPointValue }) =>
             withBusy(async () => {

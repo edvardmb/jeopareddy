@@ -1,21 +1,36 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Clue, Game } from '../api'
 import jokerHatUrl from '../assets/joker-hat.svg'
+import genderRevealSongUrl from '../assets/reveal.mp3'
 import MiniGameModal from './MiniGameModal'
 
 type PlayModeViewProps = {
   game: Game
   isBusy: boolean
+  currentTeamId: string
+  onCurrentTeamIdChange: (teamId: string) => void
   jokerConfig: {
     enabled: boolean
     assignedClueIds: string[]
+    jokerSpotCount: number
+    thiefSpotCount: number
   }
-  onResolveQuestion: (params: { clue: Clue; teamId: string; isCorrect: boolean; resolvedPointValue: number }) => Promise<void>
+  genderRevealConfig: {
+    enabled: boolean
+    assignedClueIds: string[]
+  }
+  onResolveQuestion: (params: {
+    clue: Clue
+    teamId: string
+    isCorrect: boolean
+    resolvedPointValue: number
+  }) => Promise<void>
 }
 
 type JokerDirection = 'up' | 'down'
 type JokerSpot = { kind: 'number'; value: number } | { kind: 'joker' } | { kind: 'thief' }
 type JokerOutcome = 'climb' | 'down' | 'stay' | 'joker' | 'thief'
+type GenderGuess = 'boy' | 'girl'
 
 type JokerStep = {
   baseDigit: number
@@ -37,22 +52,41 @@ type JokerRoundState = {
   lastMessage: string
 }
 
+type GenderRevealRoundState = {
+  status: 'guessing' | 'animating' | 'revealed'
+  guessedGender: GenderGuess | null
+  actualGender: GenderGuess
+  isCorrect: boolean | null
+  bonusStatus: 'idle' | 'awarding' | 'awarded' | 'missed' | 'error'
+  bonusMessage: string
+}
+
 const JOKER_STEP_COUNT = 5
 const JOKER_LADDER_STEP_POINTS = 25
 const JOKER_THIEF_POINTS = 10
 const JOKER_RESULT_HOLD_MS = 1500
 const QUESTION_REVEAL_TRANSITION_MS = 1700
+const GENDER_REVEAL_RESULT: GenderGuess = 'boy'
+const GENDER_REVEAL_BONUS_POINTS = 50
+const GENDER_REVEAL_AUDIO_START_SECONDS = 45
+const GENDER_REVEAL_REVEAL_DELAY_MS = 10500
+const GENDER_REVEAL_AUDIO_FADE_MS = 3000
 
 export default function PlayModeView(props: PlayModeViewProps) {
-  const { game, isBusy, jokerConfig, onResolveQuestion } = props
+  const { game, isBusy, currentTeamId, onCurrentTeamIdChange, jokerConfig, genderRevealConfig, onResolveQuestion } = props
   const [activeClue, setActiveClue] = useState<Clue | null>(null)
-  const [currentTeamId, setCurrentTeamId] = useState('')
   const [answerInput, setAnswerInput] = useState('')
   const [feedback, setFeedback] = useState('')
   const [hasSubmitted, setHasSubmitted] = useState(false)
   const [jokerRound, setJokerRound] = useState<JokerRoundState | null>(null)
+  const [genderRevealRound, setGenderRevealRound] = useState<GenderRevealRoundState | null>(null)
+  const [genderRevealBonusPointsForClue, setGenderRevealBonusPointsForClue] = useState(0)
   const [isJokerResultHolding, setIsJokerResultHolding] = useState(false)
   const [isQuestionRevealTransitioning, setIsQuestionRevealTransitioning] = useState(false)
+  const genderRevealAudioRef = useRef<HTMLAudioElement | null>(null)
+  const genderRevealRevealTimeoutRef = useRef<number | null>(null)
+  const genderRevealFadeIntervalRef = useRef<number | null>(null)
+  const genderRevealSequenceIdRef = useRef(0)
 
   const turnOrderTeams = useMemo(
     () => [...game.teams].sort((a, b) => a.displayOrder - b.displayOrder),
@@ -66,17 +100,19 @@ export default function PlayModeView(props: PlayModeViewProps) {
 
   useEffect(() => {
     if (!currentTeamId && turnOrderTeams.length > 0) {
-      setCurrentTeamId(turnOrderTeams[0].id)
+      onCurrentTeamIdChange(turnOrderTeams[0].id)
       return
     }
 
     if (currentTeamId && !turnOrderTeams.some((team) => team.id === currentTeamId) && turnOrderTeams.length > 0) {
-      setCurrentTeamId(turnOrderTeams[0].id)
+      onCurrentTeamIdChange(turnOrderTeams[0].id)
     }
-  }, [currentTeamId, turnOrderTeams])
+  }, [currentTeamId, onCurrentTeamIdChange, turnOrderTeams])
+
+  const activeClueId = activeClue?.id ?? null
 
   useEffect(() => {
-    if (!activeClue || jokerRound?.status !== 'completed') {
+    if (!activeClueId || jokerRound?.status !== 'completed') {
       setIsJokerResultHolding(false)
       setIsQuestionRevealTransitioning(false)
       return
@@ -98,7 +134,7 @@ export default function PlayModeView(props: PlayModeViewProps) {
       window.clearTimeout(holdTimeoutId)
       window.clearTimeout(revealTimeoutId)
     }
-  }, [activeClue?.id, jokerRound?.status])
+  }, [activeClueId, jokerRound?.status])
 
   const sortedCategories = useMemo(
     () => [...game.categories].sort((a, b) => a.displayOrder - b.displayOrder),
@@ -114,19 +150,177 @@ export default function PlayModeView(props: PlayModeViewProps) {
   }, [sortedCategories])
 
   const jokerAssignedIdSet = useMemo(() => new Set(jokerConfig.assignedClueIds), [jokerConfig.assignedClueIds])
+  const genderRevealAssignedIdSet = useMemo(() => new Set(genderRevealConfig.assignedClueIds), [genderRevealConfig.assignedClueIds])
   const jokerIsActive = jokerRound?.status === 'playing'
+  const genderRevealIsActive = genderRevealRound !== null
+  const confettiPieces = useMemo(
+    () =>
+      Array.from({ length: 22 }, (_, index) => ({
+        id: index,
+        left: `${Math.round((index / 21) * 100)}%`,
+        delayMs: Math.round((index % 7) * 90),
+        durationMs: 1300 + (index % 5) * 220,
+      })),
+    [],
+  )
+  const fireworkBursts = useMemo(
+    () => [
+      { id: 0, left: '14%', top: '18%', delayMs: 0, size: 68 },
+      { id: 1, left: '82%', top: '22%', delayMs: 450, size: 82 },
+      { id: 2, left: '28%', top: '58%', delayMs: 900, size: 74 },
+      { id: 3, left: '70%', top: '62%', delayMs: 1300, size: 78 },
+    ],
+    [],
+  )
+
+  const clearGenderRevealTimers = () => {
+    if (genderRevealRevealTimeoutRef.current !== null) {
+      window.clearTimeout(genderRevealRevealTimeoutRef.current)
+      genderRevealRevealTimeoutRef.current = null
+    }
+    if (genderRevealFadeIntervalRef.current !== null) {
+      window.clearInterval(genderRevealFadeIntervalRef.current)
+      genderRevealFadeIntervalRef.current = null
+    }
+  }
+
+  const stopGenderRevealAudio = () => {
+    clearGenderRevealTimers()
+    const audio = genderRevealAudioRef.current
+    if (!audio) {
+      return
+    }
+
+    audio.pause()
+    audio.currentTime = 0
+    audio.volume = 1
+  }
+
+  const resetActiveQuestionFlow = () => {
+    genderRevealSequenceIdRef.current += 1
+    stopGenderRevealAudio()
+    setActiveClue(null)
+    setJokerRound(null)
+    setGenderRevealRound(null)
+    setGenderRevealBonusPointsForClue(0)
+    setIsJokerResultHolding(false)
+    setIsQuestionRevealTransitioning(false)
+    setAnswerInput('')
+    setFeedback('')
+    setHasSubmitted(false)
+  }
+
+  const handleGenderGuess = (guess: GenderGuess) => {
+    if (!genderRevealRound || genderRevealRound.status !== 'guessing') {
+      return
+    }
+
+    const sequenceId = genderRevealSequenceIdRef.current + 1
+    genderRevealSequenceIdRef.current = sequenceId
+
+    setGenderRevealRound({
+      status: 'animating',
+      guessedGender: guess,
+      actualGender: GENDER_REVEAL_RESULT,
+      isCorrect: null,
+      bonusStatus: 'idle',
+      bonusMessage: '',
+    })
+
+    const audio = genderRevealAudioRef.current
+    if (audio) {
+      clearGenderRevealTimers()
+      audio.pause()
+      audio.volume = 0
+      try {
+        audio.currentTime = GENDER_REVEAL_AUDIO_START_SECONDS
+      } catch {
+        audio.currentTime = 0
+      }
+
+      void audio.play().catch(() => {
+        setGenderRevealRound((current) =>
+          current && current.status === 'animating'
+            ? { ...current, bonusMessage: 'Audio could not autoplay. Continue with the reveal.' }
+            : current,
+        )
+      })
+
+      const fadeTickMs = 120
+      const fadeSteps = Math.max(1, Math.floor(GENDER_REVEAL_AUDIO_FADE_MS / fadeTickMs))
+      let step = 0
+      genderRevealFadeIntervalRef.current = window.setInterval(() => {
+        step += 1
+        if (!genderRevealAudioRef.current) {
+          clearGenderRevealTimers()
+          return
+        }
+        genderRevealAudioRef.current.volume = Math.min(1, step / fadeSteps)
+        if (step >= fadeSteps && genderRevealFadeIntervalRef.current !== null) {
+          window.clearInterval(genderRevealFadeIntervalRef.current)
+          genderRevealFadeIntervalRef.current = null
+        }
+      }, fadeTickMs)
+    }
+
+    genderRevealRevealTimeoutRef.current = window.setTimeout(() => {
+      const isCorrect = guess === GENDER_REVEAL_RESULT
+      setGenderRevealRound((current) => {
+        if (!current || current.guessedGender !== guess) {
+          return current
+        }
+
+        return {
+          ...current,
+          status: 'revealed',
+          isCorrect,
+          bonusStatus: isCorrect ? 'awarded' : 'missed',
+          bonusMessage: isCorrect
+            ? `Correct guess! +${GENDER_REVEAL_BONUS_POINTS} points added to this clue's value.`
+            : 'No points lost for a wrong guess.',
+        }
+      })
+
+      if (!isCorrect) {
+        return
+      }
+
+      if (genderRevealSequenceIdRef.current !== sequenceId) {
+        return
+      }
+
+      setGenderRevealBonusPointsForClue(GENDER_REVEAL_BONUS_POINTS)
+    }, GENDER_REVEAL_REVEAL_DELAY_MS)
+  }
+
+  useEffect(() => {
+    const audio = new Audio(genderRevealSongUrl)
+    audio.preload = 'auto'
+    genderRevealAudioRef.current = audio
+
+    return () => {
+      genderRevealSequenceIdRef.current += 1
+      if (genderRevealRevealTimeoutRef.current !== null) {
+        window.clearTimeout(genderRevealRevealTimeoutRef.current)
+        genderRevealRevealTimeoutRef.current = null
+      }
+      if (genderRevealFadeIntervalRef.current !== null) {
+        window.clearInterval(genderRevealFadeIntervalRef.current)
+        genderRevealFadeIntervalRef.current = null
+      }
+      audio.pause()
+      genderRevealAudioRef.current = null
+    }
+  }, [])
 
   const resolvedPointValue = useMemo(() => {
     if (!activeClue) {
       return 0
     }
 
-    if (!jokerRound || jokerRound.finalPoints === null) {
-      return activeClue.pointValue
-    }
-
-    return jokerRound.finalPoints
-  }, [activeClue, jokerRound])
+    const baseValue = !jokerRound || jokerRound.finalPoints === null ? activeClue.pointValue : jokerRound.finalPoints
+    return baseValue + genderRevealBonusPointsForClue
+  }, [activeClue, genderRevealBonusPointsForClue, jokerRound])
 
   if (game.categories.length === 0) {
     return (
@@ -170,9 +364,20 @@ export default function PlayModeView(props: PlayModeViewProps) {
                       return
                     }
 
+                    const shouldTriggerGenderReveal = genderRevealConfig.enabled && genderRevealAssignedIdSet.has(clue.id)
                     const shouldTriggerJoker = jokerConfig.enabled && jokerAssignedIdSet.has(clue.id)
                     setActiveClue(clue)
-                    setJokerRound(shouldTriggerJoker ? createJokerRound(clue.pointValue) : null)
+                    setJokerRound(
+                      shouldTriggerJoker && !shouldTriggerGenderReveal
+                        ? createJokerRound(clue.pointValue, {
+                            jokerSpotCount: jokerConfig.jokerSpotCount,
+                            thiefSpotCount: jokerConfig.thiefSpotCount,
+                          })
+                        : null,
+                    )
+                    setGenderRevealRound(shouldTriggerGenderReveal ? createGenderRevealRound() : null)
+                    setGenderRevealBonusPointsForClue(0)
+                    stopGenderRevealAudio()
                     setIsJokerResultHolding(false)
                     setIsQuestionRevealTransitioning(false)
                     setAnswerInput('')
@@ -188,6 +393,103 @@ export default function PlayModeView(props: PlayModeViewProps) {
         ))}
       </div>
 
+      {activeClue && genderRevealRound && (
+        <MiniGameModal
+          title="Gender Reveal"
+          subtitle={`Team ${currentTeam?.name ?? ''}: make your guess before the reveal drops`}
+          closeLabel={genderRevealRound.status === 'revealed' ? 'Close' : 'Cancel'}
+          onClose={() => {
+            resetActiveQuestionFlow()
+          }}
+        >
+          <div
+            className={`gender-reveal-stage ${genderRevealRound.status} ${genderRevealRound.status === 'revealed' ? `result-${genderRevealRound.actualGender}` : ''}`}
+          >
+            <div className="gender-reveal-halves" aria-label="Pick boy or girl">
+              <button
+                type="button"
+                className={`gender-half girl ${genderRevealRound.guessedGender === 'girl' ? 'selected' : ''}`}
+                disabled={genderRevealRound.status !== 'guessing' || isBusy}
+                onClick={() => handleGenderGuess('girl')}
+              >
+                <span className="gender-half-label">Girl</span>
+                <span className="gender-half-subtitle">Pink side</span>
+              </button>
+
+              <button
+                type="button"
+                className={`gender-half boy ${genderRevealRound.guessedGender === 'boy' ? 'selected' : ''}`}
+                disabled={genderRevealRound.status !== 'guessing' || isBusy}
+                onClick={() => handleGenderGuess('boy')}
+              >
+                <span className="gender-half-label">Boy</span>
+                <span className="gender-half-subtitle">Blue side</span>
+              </button>
+
+              <div
+                className={`gender-reveal-pointer ${genderRevealRound.status} ${
+                  genderRevealRound.status === 'guessing' && genderRevealRound.guessedGender ? `guess-${genderRevealRound.guessedGender}` : ''
+                } ${genderRevealRound.status === 'revealed' ? `result-${genderRevealRound.actualGender}` : ''}`}
+                aria-hidden="true"
+              >
+                <div className="gender-reveal-pointer-ring" />
+                <div className="gender-reveal-pointer-core">?</div>
+              </div>
+            </div>
+
+            {genderRevealRound.status === 'revealed' && (
+              <div className="gender-reveal-result-wrap">
+                <p className={`gender-reveal-banner ${genderRevealRound.isCorrect ? 'correct' : 'miss'}`}>It&apos;s a boy!</p>
+                  <p className="gender-reveal-bonus-note">{genderRevealRound.bonusMessage}</p>
+                <button
+                  type="button"
+                  className="btn-success"
+                  onClick={() => {
+                    stopGenderRevealAudio()
+                    setGenderRevealRound(null)
+                  }}
+                >
+                  Continue
+                </button>
+              </div>
+            )}
+
+            {genderRevealRound.status === 'revealed' && genderRevealRound.actualGender === 'boy' && (
+              <>
+                <div className="gender-reveal-confetti" aria-hidden="true">
+                  {confettiPieces.map((piece) => (
+                    <span
+                      key={piece.id}
+                      className={`confetti-piece confetti-${piece.id % 4}`}
+                      style={{
+                        left: piece.left,
+                        animationDelay: `${piece.delayMs}ms`,
+                        animationDuration: `${piece.durationMs}ms`,
+                      }}
+                    />
+                  ))}
+                </div>
+                <div className="gender-reveal-fireworks" aria-hidden="true">
+                  {fireworkBursts.map((burst) => (
+                    <span
+                      key={burst.id}
+                      className="firework-burst"
+                      style={{
+                        left: burst.left,
+                        top: burst.top,
+                        width: `${burst.size}px`,
+                        height: `${burst.size}px`,
+                        animationDelay: `${burst.delayMs}ms`,
+                      }}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        </MiniGameModal>
+      )}
+
       {activeClue && jokerRound && (jokerIsActive || isJokerResultHolding) && (
         <MiniGameModal
           title="Joker Mini-Game"
@@ -195,13 +497,7 @@ export default function PlayModeView(props: PlayModeViewProps) {
           headerVisual={<img className="joker-hat-logo" src={jokerHatUrl} alt="Joker hat" />}
           closeLabel="Cancel"
           onClose={() => {
-            setActiveClue(null)
-            setJokerRound(null)
-            setIsJokerResultHolding(false)
-            setIsQuestionRevealTransitioning(false)
-            setAnswerInput('')
-            setFeedback('')
-            setHasSubmitted(false)
+            resetActiveQuestionFlow()
           }}
         >
           <div className="joker-stage">
@@ -273,7 +569,7 @@ export default function PlayModeView(props: PlayModeViewProps) {
         </div>
       )}
 
-      {activeClue && !jokerIsActive && !isQuestionRevealTransitioning && (
+      {activeClue && !genderRevealIsActive && !jokerIsActive && !isQuestionRevealTransitioning && (
         <div className="modal-backdrop">
           <div
             className={`modal-card ${jokerRound?.status === 'completed' ? 'question-reveal-modal' : ''}`}
@@ -281,7 +577,10 @@ export default function PlayModeView(props: PlayModeViewProps) {
             aria-modal="true"
             aria-labelledby="play-modal-title"
           >
-            <h3 id="play-modal-title">Question for {resolvedPointValue} points</h3>
+            <h3 id="play-modal-title">
+              Question for {resolvedPointValue} points
+              {genderRevealBonusPointsForClue > 0 ? ` (includes +${genderRevealBonusPointsForClue} reveal bonus)` : ''}
+            </h3>
             {jokerRound?.status === 'completed' && (
               <p className={`message ${jokerRound.thiefHit ? 'error' : 'success'}`}>
                 {jokerRound.thiefHit
@@ -310,23 +609,38 @@ export default function PlayModeView(props: PlayModeViewProps) {
                 value={answerInput}
                 onChange={(event) => setAnswerInput(event.target.value)}
                 placeholder="Type answer"
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck={false}
               />
             </div>
 
-            <div className="row">
+            <div className="row play-answer-actions">
               <button
                 className="btn-success"
                 disabled={isBusy || !currentTeamId || !answerInput.trim() || hasSubmitted}
                 onClick={async () => {
                   const isCorrect = normalize(answerInput) === normalize(activeClue.answer)
-                  setFeedback(isCorrect ? 'Correct answer!' : `Wrong. Correct answer: ${activeClue.answer}`)
+                  setFeedback(
+                    isCorrect
+                      ? genderRevealBonusPointsForClue > 0
+                        ? `Correct answer! ${resolvedPointValue} total points (includes +${genderRevealBonusPointsForClue} reveal bonus).`
+                        : 'Correct answer!'
+                      : `Wrong. Correct answer: ${activeClue.answer}`,
+                  )
                   setHasSubmitted(true)
-                  await onResolveQuestion({ clue: activeClue, teamId: currentTeamId, isCorrect, resolvedPointValue })
+                  await onResolveQuestion({
+                    clue: activeClue,
+                    teamId: currentTeamId,
+                    isCorrect,
+                    resolvedPointValue,
+                  })
 
                   const currentIndex = turnOrderTeams.findIndex((team) => team.id === currentTeamId)
                   if (currentIndex >= 0 && turnOrderTeams.length > 0) {
                     const nextIndex = (currentIndex + 1) % turnOrderTeams.length
-                    setCurrentTeamId(turnOrderTeams[nextIndex].id)
+                    onCurrentTeamIdChange(turnOrderTeams[nextIndex].id)
                   }
                 }}
               >
@@ -335,14 +649,9 @@ export default function PlayModeView(props: PlayModeViewProps) {
               <button
                 className="btn-secondary"
                 type="button"
+                disabled={!hasSubmitted || isBusy}
                 onClick={() => {
-                  setActiveClue(null)
-                  setJokerRound(null)
-                  setIsJokerResultHolding(false)
-                  setIsQuestionRevealTransitioning(false)
-                  setAnswerInput('')
-                  setFeedback('')
-                  setHasSubmitted(false)
+                  resetActiveQuestionFlow()
                 }}
               >
                 Close
@@ -396,15 +705,19 @@ function getClueImageSrc(clue: Clue): string | null {
   return `data:${clue.imageMimeType};base64,${clue.imageBase64}`
 }
 
-function createJokerRound(basePoints: number): JokerRoundState {
-  const specialPositions = shuffleNumbers(Array.from({ length: 10 }, (_, i) => i)).slice(0, 2)
-  const jokerPosition = specialPositions[0]
-  const thiefPosition = specialPositions[1]
+function createJokerRound(basePoints: number, options?: { jokerSpotCount?: number; thiefSpotCount?: number }): JokerRoundState {
+  const totalSpots = JOKER_STEP_COUNT * 2
+  const jokerSpotCount = Math.max(0, Math.min(totalSpots, Math.floor(options?.jokerSpotCount ?? 1)))
+  const thiefSpotCountRequested = Math.max(0, Math.floor(options?.thiefSpotCount ?? 1))
+  const thiefSpotCount = Math.min(totalSpots - jokerSpotCount, thiefSpotCountRequested)
+  const shuffledPositions = shuffleNumbers(Array.from({ length: totalSpots }, (_, i) => i))
+  const jokerPositionSet = new Set(shuffledPositions.slice(0, jokerSpotCount))
+  const thiefPositionSet = new Set(shuffledPositions.slice(jokerSpotCount, jokerSpotCount + thiefSpotCount))
 
   const steps: JokerStep[] = Array.from({ length: JOKER_STEP_COUNT }, (_, index) => ({
     baseDigit: randomDigit(),
-    upSpot: createJokerSpot(index * 2, jokerPosition, thiefPosition),
-    downSpot: createJokerSpot(index * 2 + 1, jokerPosition, thiefPosition),
+    upSpot: createJokerSpot(index * 2, jokerPositionSet, thiefPositionSet),
+    downSpot: createJokerSpot(index * 2 + 1, jokerPositionSet, thiefPositionSet),
     choice: null,
     revealedSpot: null,
     outcome: null,
@@ -419,6 +732,17 @@ function createJokerRound(basePoints: number): JokerRoundState {
     jokerHit: false,
     thiefHit: false,
     lastMessage: `Choose UP or DOWN for step 1. Base clue value: ${basePoints} points.`,
+  }
+}
+
+function createGenderRevealRound(): GenderRevealRoundState {
+  return {
+    status: 'guessing',
+    guessedGender: null,
+    actualGender: GENDER_REVEAL_RESULT,
+    isCorrect: null,
+    bonusStatus: 'idle',
+    bonusMessage: '',
   }
 }
 
@@ -569,12 +893,12 @@ function getCurrentJokerRungForDisplay(round: JokerRoundState): number {
   return round.currentRung
 }
 
-function createJokerSpot(position: number, jokerPosition: number, thiefPosition: number): JokerSpot {
-  if (position === jokerPosition) {
+function createJokerSpot(position: number, jokerPositions: Set<number>, thiefPositions: Set<number>): JokerSpot {
+  if (jokerPositions.has(position)) {
     return { kind: 'joker' }
   }
 
-  if (position === thiefPosition) {
+  if (thiefPositions.has(position)) {
     return { kind: 'thief' }
   }
 

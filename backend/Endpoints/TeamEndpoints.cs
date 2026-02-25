@@ -10,6 +10,7 @@ public static class TeamEndpoints
     public static IEndpointRouteBuilder MapTeamEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapPost("/api/games/{gameId:guid}/teams", CreateTeamAsync);
+        app.MapDelete("/api/games/{gameId:guid}/teams/{teamId:guid}", DeleteTeamAsync);
         return app;
     }
 
@@ -75,5 +76,34 @@ public static class TeamEndpoints
             GameId: team.GameId,
             Name: team.Name,
             DisplayOrder: team.DisplayOrder));
+    }
+
+    private static async Task<IResult> DeleteTeamAsync(Guid gameId, Guid teamId, JeopareddyDbContext db)
+    {
+        var game = await db.Games.FirstOrDefaultAsync(g => g.Id == gameId);
+        if (game is null)
+        {
+            return Results.NotFound();
+        }
+
+        if (game.Status != GameStatus.Draft)
+        {
+            return Results.Conflict(new
+            {
+                message = "Teams can only be removed while the game is in Draft status."
+            });
+        }
+
+        var team = await db.Teams.FirstOrDefaultAsync(t => t.Id == teamId && t.GameId == gameId);
+        if (team is null)
+        {
+            return Results.NotFound();
+        }
+
+        db.Teams.Remove(team);
+        game.UpdatedAtUtc = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+
+        return Results.NoContent();
     }
 }

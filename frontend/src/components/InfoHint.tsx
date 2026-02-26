@@ -1,13 +1,13 @@
-import { useTranslation } from 'react-i18next'
+import { useTranslation } from "react-i18next";
 
 type InfoHintProps = {
-  text: string
-  label?: string
-}
+  text: string;
+  label?: string;
+};
 
 export default function InfoHint(props: InfoHintProps) {
-  const { t } = useTranslation()
-  const { text, label = t('common.info') } = props
+  const { t } = useTranslation();
+  const { text, label = t("common.info") } = props;
 
   return (
     <span className="info-hint" tabIndex={0} aria-label={`${label}: ${text}`}>
@@ -18,5 +18,5 @@ export default function InfoHint(props: InfoHintProps) {
         {text}
       </span>
     </span>
-  )
+  );
 }

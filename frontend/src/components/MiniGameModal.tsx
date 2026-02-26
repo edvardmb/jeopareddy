@@ -1,21 +1,33 @@
-import { ReactNode } from 'react'
-import { useTranslation } from 'react-i18next'
+import { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 type MiniGameModalProps = {
-  title: string
-  subtitle?: string
-  onClose: () => void
-  closeLabel?: string
-  headerVisual?: ReactNode
-  children: ReactNode
-}
+  title: string;
+  subtitle?: string;
+  onClose: () => void;
+  closeLabel?: string;
+  headerVisual?: ReactNode;
+  children: ReactNode;
+};
 
 export default function MiniGameModal(props: MiniGameModalProps) {
-  const { t } = useTranslation()
-  const { title, subtitle, onClose, closeLabel = t('components.miniGameModal.closeLabel'), headerVisual, children } = props
+  const { t } = useTranslation();
+  const {
+    title,
+    subtitle,
+    onClose,
+    closeLabel = t("components.miniGameModal.closeLabel"),
+    headerVisual,
+    children,
+  } = props;
 
   return (
-    <div className="minigame-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="minigame-modal-title">
+    <div
+      className="minigame-modal-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="minigame-modal-title"
+    >
       <div className="minigame-modal-card">
         <div className="minigame-glow minigame-glow-a" aria-hidden="true" />
         <div className="minigame-glow minigame-glow-b" aria-hidden="true" />
@@ -37,5 +49,5 @@ export default function MiniGameModal(props: MiniGameModalProps) {
         {children}
       </div>
     </div>
-  )
+  );
 }

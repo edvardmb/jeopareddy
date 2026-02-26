@@ -1,162 +1,192 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import type { TFunction } from 'i18next'
-import { useTranslation } from 'react-i18next'
-import { Clue, Game } from '../api'
-import jokerHatUrl from '../assets/joker-hat.svg'
-import genderRevealSongUrl from '../assets/reveal.mp3'
-import MiniGameModal from './MiniGameModal'
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
+import { Clue, Game } from "../api";
+import jokerHatUrl from "../assets/joker-hat.svg";
+import genderRevealSongUrl from "../assets/reveal.mp3";
+import MiniGameModal from "./MiniGameModal";
 
 type PlayModeViewProps = {
-  game: Game
-  isBusy: boolean
-  currentTeamId: string
-  onCurrentTeamIdChange: (teamId: string) => void
+  game: Game;
+  isBusy: boolean;
+  currentTeamId: string;
+  onCurrentTeamIdChange: (teamId: string) => void;
   jokerConfig: {
-    enabled: boolean
-    assignedClueIds: string[]
-    jokerSpotCount: number
-    thiefSpotCount: number
-  }
+    enabled: boolean;
+    assignedClueIds: string[];
+    jokerSpotCount: number;
+    thiefSpotCount: number;
+  };
   genderRevealConfig: {
-    enabled: boolean
-    assignedClueIds: string[]
-  }
+    enabled: boolean;
+    assignedClueIds: string[];
+  };
   onResolveQuestion: (params: {
-    clue: Clue
-    teamId: string
-    isCorrect: boolean
-    resolvedPointValue: number
-  }) => Promise<void>
-}
+    clue: Clue;
+    teamId: string;
+    isCorrect: boolean;
+    resolvedPointValue: number;
+  }) => Promise<void>;
+};
 
-type JokerDirection = 'up' | 'down'
-type JokerSpot = { kind: 'number'; value: number } | { kind: 'joker' } | { kind: 'thief' }
-type JokerOutcome = 'climb' | 'down' | 'stay' | 'joker' | 'thief'
-type GenderGuess = 'boy' | 'girl'
+type JokerDirection = "up" | "down";
+type JokerSpot =
+  | { kind: "number"; value: number }
+  | { kind: "joker" }
+  | { kind: "thief" };
+type JokerOutcome = "climb" | "down" | "stay" | "joker" | "thief";
+type GenderGuess = "boy" | "girl";
 
 type JokerStep = {
-  baseDigit: number
-  upSpot: JokerSpot
-  downSpot: JokerSpot
-  choice: JokerDirection | null
-  revealedSpot: JokerSpot | null
-  outcome: JokerOutcome | null
-}
+  baseDigit: number;
+  upSpot: JokerSpot;
+  downSpot: JokerSpot;
+  choice: JokerDirection | null;
+  revealedSpot: JokerSpot | null;
+  outcome: JokerOutcome | null;
+};
 
 type JokerRoundState = {
-  steps: JokerStep[]
-  currentStepIndex: number
-  currentRung: number
-  status: 'playing' | 'completed'
-  finalPoints: number | null
-  jokerHit: boolean
-  thiefHit: boolean
-  lastMessage: string
-}
+  steps: JokerStep[];
+  currentStepIndex: number;
+  currentRung: number;
+  status: "playing" | "completed";
+  finalPoints: number | null;
+  jokerHit: boolean;
+  thiefHit: boolean;
+  lastMessage: string;
+};
 
 type GenderRevealRoundState = {
-  status: 'guessing' | 'animating' | 'revealed'
-  guessedGender: GenderGuess | null
-  actualGender: GenderGuess
-  isCorrect: boolean | null
-  bonusStatus: 'idle' | 'awarding' | 'awarded' | 'missed' | 'error'
-  bonusMessage: string
-}
+  status: "guessing" | "animating" | "revealed";
+  guessedGender: GenderGuess | null;
+  actualGender: GenderGuess;
+  isCorrect: boolean | null;
+  bonusStatus: "idle" | "awarding" | "awarded" | "missed" | "error";
+  bonusMessage: string;
+};
 
-const JOKER_STEP_COUNT = 5
-const JOKER_LADDER_STEP_POINTS = 25
-const JOKER_THIEF_POINTS = 10
-const JOKER_RESULT_HOLD_MS = 1500
-const QUESTION_REVEAL_TRANSITION_MS = 1700
-const GENDER_REVEAL_RESULT: GenderGuess = 'boy'
-const GENDER_REVEAL_BONUS_POINTS = 50
-const GENDER_REVEAL_AUDIO_START_SECONDS = 45
-const GENDER_REVEAL_REVEAL_DELAY_MS = 10500
-const GENDER_REVEAL_AUDIO_FADE_MS = 3000
+const JOKER_STEP_COUNT = 5;
+const JOKER_LADDER_STEP_POINTS = 25;
+const JOKER_THIEF_POINTS = 10;
+const JOKER_RESULT_HOLD_MS = 1500;
+const QUESTION_REVEAL_TRANSITION_MS = 1700;
+const GENDER_REVEAL_RESULT: GenderGuess = "boy";
+const GENDER_REVEAL_BONUS_POINTS = 50;
+const GENDER_REVEAL_AUDIO_START_SECONDS = 45;
+const GENDER_REVEAL_REVEAL_DELAY_MS = 10500;
+const GENDER_REVEAL_AUDIO_FADE_MS = 3000;
 
 export default function PlayModeView(props: PlayModeViewProps) {
-  const { t } = useTranslation()
-  const { game, isBusy, currentTeamId, onCurrentTeamIdChange, jokerConfig, genderRevealConfig, onResolveQuestion } = props
-  const [activeClue, setActiveClue] = useState<Clue | null>(null)
-  const [answerInput, setAnswerInput] = useState('')
-  const [feedback, setFeedback] = useState('')
-  const [feedbackTone, setFeedbackTone] = useState<'success' | 'error' | ''>('')
-  const [hasSubmitted, setHasSubmitted] = useState(false)
-  const [jokerRound, setJokerRound] = useState<JokerRoundState | null>(null)
-  const [genderRevealRound, setGenderRevealRound] = useState<GenderRevealRoundState | null>(null)
-  const [genderRevealBonusPointsForClue, setGenderRevealBonusPointsForClue] = useState(0)
-  const [isJokerResultHolding, setIsJokerResultHolding] = useState(false)
-  const [isQuestionRevealTransitioning, setIsQuestionRevealTransitioning] = useState(false)
-  const genderRevealAudioRef = useRef<HTMLAudioElement | null>(null)
-  const genderRevealRevealTimeoutRef = useRef<number | null>(null)
-  const genderRevealFadeIntervalRef = useRef<number | null>(null)
-  const genderRevealSequenceIdRef = useRef(0)
+  const { t } = useTranslation();
+  const {
+    game,
+    isBusy,
+    currentTeamId,
+    onCurrentTeamIdChange,
+    jokerConfig,
+    genderRevealConfig,
+    onResolveQuestion,
+  } = props;
+  const [activeClue, setActiveClue] = useState<Clue | null>(null);
+  const [answerInput, setAnswerInput] = useState("");
+  const [feedback, setFeedback] = useState("");
+  const [feedbackTone, setFeedbackTone] = useState<"success" | "error" | "">(
+    "",
+  );
+  const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [jokerRound, setJokerRound] = useState<JokerRoundState | null>(null);
+  const [genderRevealRound, setGenderRevealRound] =
+    useState<GenderRevealRoundState | null>(null);
+  const [genderRevealBonusPointsForClue, setGenderRevealBonusPointsForClue] =
+    useState(0);
+  const [isJokerResultHolding, setIsJokerResultHolding] = useState(false);
+  const [isQuestionRevealTransitioning, setIsQuestionRevealTransitioning] =
+    useState(false);
+  const genderRevealAudioRef = useRef<HTMLAudioElement | null>(null);
+  const genderRevealRevealTimeoutRef = useRef<number | null>(null);
+  const genderRevealFadeIntervalRef = useRef<number | null>(null);
+  const genderRevealSequenceIdRef = useRef(0);
 
   const turnOrderTeams = useMemo(
     () => [...game.teams].sort((a, b) => a.displayOrder - b.displayOrder),
     [game.teams],
-  )
+  );
   const scoreOrderedTeams = useMemo(
-    () => [...game.teams].sort((a, b) => b.score - a.score || a.displayOrder - b.displayOrder),
+    () =>
+      [...game.teams].sort(
+        (a, b) => b.score - a.score || a.displayOrder - b.displayOrder,
+      ),
     [game.teams],
-  )
-  const currentTeam = turnOrderTeams.find((team) => team.id === currentTeamId) ?? null
+  );
+  const currentTeam =
+    turnOrderTeams.find((team) => team.id === currentTeamId) ?? null;
 
   useEffect(() => {
     if (!currentTeamId && turnOrderTeams.length > 0) {
-      onCurrentTeamIdChange(turnOrderTeams[0].id)
-      return
+      onCurrentTeamIdChange(turnOrderTeams[0].id);
+      return;
     }
 
-    if (currentTeamId && !turnOrderTeams.some((team) => team.id === currentTeamId) && turnOrderTeams.length > 0) {
-      onCurrentTeamIdChange(turnOrderTeams[0].id)
+    if (
+      currentTeamId &&
+      !turnOrderTeams.some((team) => team.id === currentTeamId) &&
+      turnOrderTeams.length > 0
+    ) {
+      onCurrentTeamIdChange(turnOrderTeams[0].id);
     }
-  }, [currentTeamId, onCurrentTeamIdChange, turnOrderTeams])
+  }, [currentTeamId, onCurrentTeamIdChange, turnOrderTeams]);
 
-  const activeClueId = activeClue?.id ?? null
+  const activeClueId = activeClue?.id ?? null;
 
   useEffect(() => {
-    if (!activeClueId || jokerRound?.status !== 'completed') {
-      setIsJokerResultHolding(false)
-      setIsQuestionRevealTransitioning(false)
-      return
+    if (!activeClueId || jokerRound?.status !== "completed") {
+      setIsJokerResultHolding(false);
+      setIsQuestionRevealTransitioning(false);
+      return;
     }
 
-    setIsJokerResultHolding(true)
-    setIsQuestionRevealTransitioning(false)
+    setIsJokerResultHolding(true);
+    setIsQuestionRevealTransitioning(false);
 
     const holdTimeoutId = window.setTimeout(() => {
-      setIsJokerResultHolding(false)
-      setIsQuestionRevealTransitioning(true)
-    }, JOKER_RESULT_HOLD_MS)
+      setIsJokerResultHolding(false);
+      setIsQuestionRevealTransitioning(true);
+    }, JOKER_RESULT_HOLD_MS);
 
     const revealTimeoutId = window.setTimeout(() => {
-      setIsQuestionRevealTransitioning(false)
-    }, JOKER_RESULT_HOLD_MS + QUESTION_REVEAL_TRANSITION_MS)
+      setIsQuestionRevealTransitioning(false);
+    }, JOKER_RESULT_HOLD_MS + QUESTION_REVEAL_TRANSITION_MS);
 
     return () => {
-      window.clearTimeout(holdTimeoutId)
-      window.clearTimeout(revealTimeoutId)
-    }
-  }, [activeClueId, jokerRound?.status])
+      window.clearTimeout(holdTimeoutId);
+      window.clearTimeout(revealTimeoutId);
+    };
+  }, [activeClueId, jokerRound?.status]);
 
   const sortedCategories = useMemo(
     () => [...game.categories].sort((a, b) => a.displayOrder - b.displayOrder),
     [game.categories],
-  )
+  );
 
   const rowValues = useMemo(() => {
-    const values = new Set<number>()
+    const values = new Set<number>();
     sortedCategories.forEach((category) => {
-      category.clues.forEach((clue) => values.add(clue.pointValue))
-    })
-    return Array.from(values).sort((a, b) => a - b)
-  }, [sortedCategories])
+      category.clues.forEach((clue) => values.add(clue.pointValue));
+    });
+    return Array.from(values).sort((a, b) => a - b);
+  }, [sortedCategories]);
 
-  const jokerAssignedIdSet = useMemo(() => new Set(jokerConfig.assignedClueIds), [jokerConfig.assignedClueIds])
-  const genderRevealAssignedIdSet = useMemo(() => new Set(genderRevealConfig.assignedClueIds), [genderRevealConfig.assignedClueIds])
-  const jokerIsActive = jokerRound?.status === 'playing'
-  const genderRevealIsActive = genderRevealRound !== null
+  const jokerAssignedIdSet = useMemo(
+    () => new Set(jokerConfig.assignedClueIds),
+    [jokerConfig.assignedClueIds],
+  );
+  const genderRevealAssignedIdSet = useMemo(
+    () => new Set(genderRevealConfig.assignedClueIds),
+    [genderRevealConfig.assignedClueIds],
+  );
+  const jokerIsActive = jokerRound?.status === "playing";
+  const genderRevealIsActive = genderRevealRound !== null;
   const confettiPieces = useMemo(
     () =>
       Array.from({ length: 22 }, (_, index) => ({
@@ -166,212 +196,230 @@ export default function PlayModeView(props: PlayModeViewProps) {
         durationMs: 1300 + (index % 5) * 220,
       })),
     [],
-  )
+  );
   const fireworkBursts = useMemo(
     () => [
-      { id: 0, left: '14%', top: '18%', delayMs: 0, size: 68 },
-      { id: 1, left: '82%', top: '22%', delayMs: 450, size: 82 },
-      { id: 2, left: '28%', top: '58%', delayMs: 900, size: 74 },
-      { id: 3, left: '70%', top: '62%', delayMs: 1300, size: 78 },
+      { id: 0, left: "14%", top: "18%", delayMs: 0, size: 68 },
+      { id: 1, left: "82%", top: "22%", delayMs: 450, size: 82 },
+      { id: 2, left: "28%", top: "58%", delayMs: 900, size: 74 },
+      { id: 3, left: "70%", top: "62%", delayMs: 1300, size: 78 },
     ],
     [],
-  )
+  );
 
   const clearGenderRevealTimers = () => {
     if (genderRevealRevealTimeoutRef.current !== null) {
-      window.clearTimeout(genderRevealRevealTimeoutRef.current)
-      genderRevealRevealTimeoutRef.current = null
+      window.clearTimeout(genderRevealRevealTimeoutRef.current);
+      genderRevealRevealTimeoutRef.current = null;
     }
     if (genderRevealFadeIntervalRef.current !== null) {
-      window.clearInterval(genderRevealFadeIntervalRef.current)
-      genderRevealFadeIntervalRef.current = null
+      window.clearInterval(genderRevealFadeIntervalRef.current);
+      genderRevealFadeIntervalRef.current = null;
     }
-  }
+  };
 
   const stopGenderRevealAudio = () => {
-    clearGenderRevealTimers()
-    const audio = genderRevealAudioRef.current
+    clearGenderRevealTimers();
+    const audio = genderRevealAudioRef.current;
     if (!audio) {
-      return
+      return;
     }
 
-    audio.pause()
-    audio.currentTime = 0
-    audio.volume = 1
-  }
+    audio.pause();
+    audio.currentTime = 0;
+    audio.volume = 1;
+  };
 
   const resetActiveQuestionFlow = () => {
-    genderRevealSequenceIdRef.current += 1
-    stopGenderRevealAudio()
-    setActiveClue(null)
-    setJokerRound(null)
-    setGenderRevealRound(null)
-    setGenderRevealBonusPointsForClue(0)
-    setIsJokerResultHolding(false)
-    setIsQuestionRevealTransitioning(false)
-    setAnswerInput('')
-    setFeedback('')
-    setFeedbackTone('')
-    setHasSubmitted(false)
-  }
+    genderRevealSequenceIdRef.current += 1;
+    stopGenderRevealAudio();
+    setActiveClue(null);
+    setJokerRound(null);
+    setGenderRevealRound(null);
+    setGenderRevealBonusPointsForClue(0);
+    setIsJokerResultHolding(false);
+    setIsQuestionRevealTransitioning(false);
+    setAnswerInput("");
+    setFeedback("");
+    setFeedbackTone("");
+    setHasSubmitted(false);
+  };
 
   const handleGenderGuess = (guess: GenderGuess) => {
-    if (!genderRevealRound || genderRevealRound.status !== 'guessing') {
-      return
+    if (!genderRevealRound || genderRevealRound.status !== "guessing") {
+      return;
     }
 
-    const sequenceId = genderRevealSequenceIdRef.current + 1
-    genderRevealSequenceIdRef.current = sequenceId
+    const sequenceId = genderRevealSequenceIdRef.current + 1;
+    genderRevealSequenceIdRef.current = sequenceId;
 
     setGenderRevealRound({
-      status: 'animating',
+      status: "animating",
       guessedGender: guess,
       actualGender: GENDER_REVEAL_RESULT,
       isCorrect: null,
-      bonusStatus: 'idle',
-      bonusMessage: '',
-    })
+      bonusStatus: "idle",
+      bonusMessage: "",
+    });
 
-    const audio = genderRevealAudioRef.current
+    const audio = genderRevealAudioRef.current;
     if (audio) {
-      clearGenderRevealTimers()
-      audio.pause()
-      audio.volume = 0
+      clearGenderRevealTimers();
+      audio.pause();
+      audio.volume = 0;
       try {
-        audio.currentTime = GENDER_REVEAL_AUDIO_START_SECONDS
+        audio.currentTime = GENDER_REVEAL_AUDIO_START_SECONDS;
       } catch {
-        audio.currentTime = 0
+        audio.currentTime = 0;
       }
 
       void audio.play().catch(() => {
         setGenderRevealRound((current) =>
-          current && current.status === 'animating'
-            ? { ...current, bonusMessage: t('components.playModeView.audioAutoplayError') }
+          current && current.status === "animating"
+            ? {
+                ...current,
+                bonusMessage: t("components.playModeView.audioAutoplayError"),
+              }
             : current,
-        )
-      })
+        );
+      });
 
-      const fadeTickMs = 120
-      const fadeSteps = Math.max(1, Math.floor(GENDER_REVEAL_AUDIO_FADE_MS / fadeTickMs))
-      let step = 0
+      const fadeTickMs = 120;
+      const fadeSteps = Math.max(
+        1,
+        Math.floor(GENDER_REVEAL_AUDIO_FADE_MS / fadeTickMs),
+      );
+      let step = 0;
       genderRevealFadeIntervalRef.current = window.setInterval(() => {
-        step += 1
+        step += 1;
         if (!genderRevealAudioRef.current) {
-          clearGenderRevealTimers()
-          return
+          clearGenderRevealTimers();
+          return;
         }
-        genderRevealAudioRef.current.volume = Math.min(1, step / fadeSteps)
+        genderRevealAudioRef.current.volume = Math.min(1, step / fadeSteps);
         if (step >= fadeSteps && genderRevealFadeIntervalRef.current !== null) {
-          window.clearInterval(genderRevealFadeIntervalRef.current)
-          genderRevealFadeIntervalRef.current = null
+          window.clearInterval(genderRevealFadeIntervalRef.current);
+          genderRevealFadeIntervalRef.current = null;
         }
-      }, fadeTickMs)
+      }, fadeTickMs);
     }
 
     genderRevealRevealTimeoutRef.current = window.setTimeout(() => {
-      const isCorrect = guess === GENDER_REVEAL_RESULT
+      const isCorrect = guess === GENDER_REVEAL_RESULT;
       setGenderRevealRound((current) => {
         if (!current || current.guessedGender !== guess) {
-          return current
+          return current;
         }
 
         return {
           ...current,
-          status: 'revealed',
+          status: "revealed",
           isCorrect,
-          bonusStatus: isCorrect ? 'awarded' : 'missed',
+          bonusStatus: isCorrect ? "awarded" : "missed",
           bonusMessage: isCorrect
-            ? t('components.playModeView.correctGuessBonus', { points: GENDER_REVEAL_BONUS_POINTS })
-            : t('components.playModeView.wrongGuessNoPenalty'),
-        }
-      })
+            ? t("components.playModeView.correctGuessBonus", {
+                points: GENDER_REVEAL_BONUS_POINTS,
+              })
+            : t("components.playModeView.wrongGuessNoPenalty"),
+        };
+      });
 
       if (!isCorrect) {
-        return
+        return;
       }
 
       if (genderRevealSequenceIdRef.current !== sequenceId) {
-        return
+        return;
       }
 
-      setGenderRevealBonusPointsForClue(GENDER_REVEAL_BONUS_POINTS)
-    }, GENDER_REVEAL_REVEAL_DELAY_MS)
-  }
+      setGenderRevealBonusPointsForClue(GENDER_REVEAL_BONUS_POINTS);
+    }, GENDER_REVEAL_REVEAL_DELAY_MS);
+  };
 
   useEffect(() => {
-    const audio = new Audio(genderRevealSongUrl)
-    audio.preload = 'auto'
-    genderRevealAudioRef.current = audio
+    const audio = new Audio(genderRevealSongUrl);
+    audio.preload = "auto";
+    genderRevealAudioRef.current = audio;
 
     return () => {
-      genderRevealSequenceIdRef.current += 1
+      genderRevealSequenceIdRef.current += 1;
       if (genderRevealRevealTimeoutRef.current !== null) {
-        window.clearTimeout(genderRevealRevealTimeoutRef.current)
-        genderRevealRevealTimeoutRef.current = null
+        window.clearTimeout(genderRevealRevealTimeoutRef.current);
+        genderRevealRevealTimeoutRef.current = null;
       }
       if (genderRevealFadeIntervalRef.current !== null) {
-        window.clearInterval(genderRevealFadeIntervalRef.current)
-        genderRevealFadeIntervalRef.current = null
+        window.clearInterval(genderRevealFadeIntervalRef.current);
+        genderRevealFadeIntervalRef.current = null;
       }
-      audio.pause()
-      genderRevealAudioRef.current = null
-    }
-  }, [])
+      audio.pause();
+      genderRevealAudioRef.current = null;
+    };
+  }, []);
 
   const resolvedPointValue = useMemo(() => {
     if (!activeClue) {
-      return 0
+      return 0;
     }
 
-    const baseValue = !jokerRound || jokerRound.finalPoints === null ? activeClue.pointValue : jokerRound.finalPoints
-    return baseValue + genderRevealBonusPointsForClue
-  }, [activeClue, genderRevealBonusPointsForClue, jokerRound])
+    const baseValue =
+      !jokerRound || jokerRound.finalPoints === null
+        ? activeClue.pointValue
+        : jokerRound.finalPoints;
+    return baseValue + genderRevealBonusPointsForClue;
+  }, [activeClue, genderRevealBonusPointsForClue, jokerRound]);
 
   if (game.categories.length === 0) {
     return (
       <section className="card card-play">
-        <h2>{t('components.playModeView.title')}</h2>
-        <p className="muted">{t('components.playModeView.emptyState')}</p>
+        <h2>{t("components.playModeView.title")}</h2>
+        <p className="muted">{t("components.playModeView.emptyState")}</p>
       </section>
-    )
+    );
   }
 
   return (
     <section className="card card-play">
-      <h2>{t('components.playModeView.title')}</h2>
-      <p className="muted">{t('components.playModeView.subtitle')}</p>
+      <h2>{t("components.playModeView.title")}</h2>
+      <p className="muted">{t("components.playModeView.subtitle")}</p>
       {currentTeam && (
         <p className="turn-indicator">
-          {t('components.playModeView.turnIndicator')}: <strong>{currentTeam.name}</strong>
+          {t("components.playModeView.turnIndicator")}:{" "}
+          <strong>{currentTeam.name}</strong>
         </p>
       )}
 
       <div className="play-grid">
         <div className="play-row headers">
-          {sortedCategories.map((category) => (
-            <div key={category.id} className="play-cell header">
+          {sortedCategories.map((category, colIndex) => (
+            <div
+              key={category.id}
+              className={`play-cell header col-color-${colIndex % 6}`}
+            >
               {category.name}
             </div>
           ))}
         </div>
         {rowValues.map((value) => (
           <div key={value} className="play-row">
-            {sortedCategories.map((category) => {
-              const clue = category.clues.find((x) => x.pointValue === value)
-              const isUsed = !clue || clue.isAnswered
+            {sortedCategories.map((category, colIndex) => {
+              const clue = category.clues.find((x) => x.pointValue === value);
+              const isUsed = !clue || clue.isAnswered;
               return (
                 <button
                   key={`${category.id}-${value}`}
-                  className={`play-cell card-cell ${isUsed ? 'used' : ''}`}
+                  className={`play-cell card-cell col-color-${colIndex % 6} ${isUsed ? "used" : ""}`}
                   disabled={isUsed || isBusy}
                   onClick={() => {
                     if (!clue) {
-                      return
+                      return;
                     }
 
-                    const shouldTriggerGenderReveal = genderRevealConfig.enabled && genderRevealAssignedIdSet.has(clue.id)
-                    const shouldTriggerJoker = jokerConfig.enabled && jokerAssignedIdSet.has(clue.id)
-                    setActiveClue(clue)
+                    const shouldTriggerGenderReveal =
+                      genderRevealConfig.enabled &&
+                      genderRevealAssignedIdSet.has(clue.id);
+                    const shouldTriggerJoker =
+                      jokerConfig.enabled && jokerAssignedIdSet.has(clue.id);
+                    setActiveClue(clue);
                     setJokerRound(
                       shouldTriggerJoker && !shouldTriggerGenderReveal
                         ? createJokerRound(clue.pointValue, {
@@ -379,21 +427,25 @@ export default function PlayModeView(props: PlayModeViewProps) {
                             thiefSpotCount: jokerConfig.thiefSpotCount,
                           })
                         : null,
-                    )
-                    setGenderRevealRound(shouldTriggerGenderReveal ? createGenderRevealRound() : null)
-                    setGenderRevealBonusPointsForClue(0)
-                    stopGenderRevealAudio()
-                    setIsJokerResultHolding(false)
-                    setIsQuestionRevealTransitioning(false)
-                    setAnswerInput('')
-                    setFeedback('')
-                    setFeedbackTone('')
-                    setHasSubmitted(false)
+                    );
+                    setGenderRevealRound(
+                      shouldTriggerGenderReveal
+                        ? createGenderRevealRound()
+                        : null,
+                    );
+                    setGenderRevealBonusPointsForClue(0);
+                    stopGenderRevealAudio();
+                    setIsJokerResultHolding(false);
+                    setIsQuestionRevealTransitioning(false);
+                    setAnswerInput("");
+                    setFeedback("");
+                    setFeedbackTone("");
+                    setHasSubmitted(false);
                   }}
                 >
-                  {clue ? clue.pointValue : '-'}
+                  {clue ? clue.pointValue : "-"}
                 </button>
-              )
+              );
             })}
           </div>
         ))}
@@ -401,41 +453,61 @@ export default function PlayModeView(props: PlayModeViewProps) {
 
       {activeClue && genderRevealRound && (
         <MiniGameModal
-          title={t('components.playModeView.genderRevealTitle')}
-          subtitle={t('components.playModeView.genderRevealSubtitle', { teamName: currentTeam?.name ?? '' })}
-          closeLabel={genderRevealRound.status === 'revealed' ? t('components.playModeView.close') : t('components.playModeView.cancel')}
+          title={t("components.playModeView.genderRevealTitle")}
+          subtitle={t("components.playModeView.genderRevealSubtitle", {
+            teamName: currentTeam?.name ?? "",
+          })}
+          closeLabel={
+            genderRevealRound.status === "revealed"
+              ? t("components.playModeView.close")
+              : t("components.playModeView.cancel")
+          }
           onClose={() => {
-            resetActiveQuestionFlow()
+            resetActiveQuestionFlow();
           }}
         >
           <div
-            className={`gender-reveal-stage ${genderRevealRound.status} ${genderRevealRound.status === 'revealed' ? `result-${genderRevealRound.actualGender}` : ''}`}
+            className={`gender-reveal-stage ${genderRevealRound.status} ${genderRevealRound.status === "revealed" ? `result-${genderRevealRound.actualGender}` : ""}`}
           >
-            <div className="gender-reveal-halves" aria-label={t('components.playModeView.pickBoyOrGirl')}>
+            <div
+              className="gender-reveal-halves"
+              aria-label={t("components.playModeView.pickBoyOrGirl")}
+            >
               <button
                 type="button"
-                className={`gender-half girl ${genderRevealRound.guessedGender === 'girl' ? 'selected' : ''}`}
-                disabled={genderRevealRound.status !== 'guessing' || isBusy}
-                onClick={() => handleGenderGuess('girl')}
+                className={`gender-half girl ${genderRevealRound.guessedGender === "girl" ? "selected" : ""}`}
+                disabled={genderRevealRound.status !== "guessing" || isBusy}
+                onClick={() => handleGenderGuess("girl")}
               >
-                <span className="gender-half-label">{t('components.playModeView.girl')}</span>
-                <span className="gender-half-subtitle">{t('components.playModeView.girlSide')}</span>
+                <span className="gender-half-label">
+                  {t("components.playModeView.girl")}
+                </span>
+                <span className="gender-half-subtitle">
+                  {t("components.playModeView.girlSide")}
+                </span>
               </button>
 
               <button
                 type="button"
-                className={`gender-half boy ${genderRevealRound.guessedGender === 'boy' ? 'selected' : ''}`}
-                disabled={genderRevealRound.status !== 'guessing' || isBusy}
-                onClick={() => handleGenderGuess('boy')}
+                className={`gender-half boy ${genderRevealRound.guessedGender === "boy" ? "selected" : ""}`}
+                disabled={genderRevealRound.status !== "guessing" || isBusy}
+                onClick={() => handleGenderGuess("boy")}
               >
-                <span className="gender-half-label">{t('components.playModeView.boy')}</span>
-                <span className="gender-half-subtitle">{t('components.playModeView.boySide')}</span>
+                <span className="gender-half-label">
+                  {t("components.playModeView.boy")}
+                </span>
+                <span className="gender-half-subtitle">
+                  {t("components.playModeView.boySide")}
+                </span>
               </button>
 
               <div
                 className={`gender-reveal-pointer ${genderRevealRound.status} ${
-                  genderRevealRound.status === 'guessing' && genderRevealRound.guessedGender ? `guess-${genderRevealRound.guessedGender}` : ''
-                } ${genderRevealRound.status === 'revealed' ? `result-${genderRevealRound.actualGender}` : ''}`}
+                  genderRevealRound.status === "guessing" &&
+                  genderRevealRound.guessedGender
+                    ? `guess-${genderRevealRound.guessedGender}`
+                    : ""
+                } ${genderRevealRound.status === "revealed" ? `result-${genderRevealRound.actualGender}` : ""}`}
                 aria-hidden="true"
               >
                 <div className="gender-reveal-pointer-ring" />
@@ -443,80 +515,103 @@ export default function PlayModeView(props: PlayModeViewProps) {
               </div>
             </div>
 
-            {genderRevealRound.status === 'revealed' && (
+            {genderRevealRound.status === "revealed" && (
               <div className="gender-reveal-result-wrap">
-                <p className={`gender-reveal-banner ${genderRevealRound.isCorrect ? 'correct' : 'miss'}`}>{t('components.playModeView.itsABoy')}</p>
-                  <p className="gender-reveal-bonus-note">{genderRevealRound.bonusMessage}</p>
+                <p
+                  className={`gender-reveal-banner ${genderRevealRound.isCorrect ? "correct" : "miss"}`}
+                >
+                  {t("components.playModeView.itsABoy")}
+                </p>
+                <p className="gender-reveal-bonus-note">
+                  {genderRevealRound.bonusMessage}
+                </p>
                 <button
                   type="button"
                   className="btn-success"
                   onClick={() => {
-                    stopGenderRevealAudio()
-                    setGenderRevealRound(null)
+                    stopGenderRevealAudio();
+                    setGenderRevealRound(null);
                   }}
                 >
-                  {t('common.continue')}
+                  {t("common.continue")}
                 </button>
               </div>
             )}
 
-            {genderRevealRound.status === 'revealed' && genderRevealRound.actualGender === 'boy' && (
-              <>
-                <div className="gender-reveal-confetti" aria-hidden="true">
-                  {confettiPieces.map((piece) => (
-                    <span
-                      key={piece.id}
-                      className={`confetti-piece confetti-${piece.id % 4}`}
-                      style={{
-                        left: piece.left,
-                        animationDelay: `${piece.delayMs}ms`,
-                        animationDuration: `${piece.durationMs}ms`,
-                      }}
-                    />
-                  ))}
-                </div>
-                <div className="gender-reveal-fireworks" aria-hidden="true">
-                  {fireworkBursts.map((burst) => (
-                    <span
-                      key={burst.id}
-                      className="firework-burst"
-                      style={{
-                        left: burst.left,
-                        top: burst.top,
-                        width: `${burst.size}px`,
-                        height: `${burst.size}px`,
-                        animationDelay: `${burst.delayMs}ms`,
-                      }}
-                    />
-                  ))}
-                </div>
-              </>
-            )}
+            {genderRevealRound.status === "revealed" &&
+              genderRevealRound.actualGender === "boy" && (
+                <>
+                  <div className="gender-reveal-confetti" aria-hidden="true">
+                    {confettiPieces.map((piece) => (
+                      <span
+                        key={piece.id}
+                        className={`confetti-piece confetti-${piece.id % 4}`}
+                        style={{
+                          left: piece.left,
+                          animationDelay: `${piece.delayMs}ms`,
+                          animationDuration: `${piece.durationMs}ms`,
+                        }}
+                      />
+                    ))}
+                  </div>
+                  <div className="gender-reveal-fireworks" aria-hidden="true">
+                    {fireworkBursts.map((burst) => (
+                      <span
+                        key={burst.id}
+                        className="firework-burst"
+                        style={{
+                          left: burst.left,
+                          top: burst.top,
+                          width: `${burst.size}px`,
+                          height: `${burst.size}px`,
+                          animationDelay: `${burst.delayMs}ms`,
+                        }}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
           </div>
         </MiniGameModal>
       )}
 
       {activeClue && jokerRound && (jokerIsActive || isJokerResultHolding) && (
         <MiniGameModal
-          title={t('components.playModeView.jokerTitle')}
-          subtitle={t('components.playModeView.jokerSubtitle', { teamName: currentTeam?.name ?? '' })}
-          headerVisual={<img className="joker-hat-logo" src={jokerHatUrl} alt={t('components.playModeView.jokerHatAlt')} />}
-          closeLabel={t('components.playModeView.cancel')}
+          title={t("components.playModeView.jokerTitle")}
+          subtitle={t("components.playModeView.jokerSubtitle", {
+            teamName: currentTeam?.name ?? "",
+          })}
+          headerVisual={
+            <img
+              className="joker-hat-logo"
+              src={jokerHatUrl}
+              alt={t("components.playModeView.jokerHatAlt")}
+            />
+          }
+          closeLabel={t("components.playModeView.cancel")}
           onClose={() => {
-            resetActiveQuestionFlow()
+            resetActiveQuestionFlow();
           }}
         >
           <div className="joker-stage">
             <div className="joker-ladder-panel">
-              <div className="joker-ladder" aria-label={t('components.playModeView.jokerPrizeLadderAria')}>
+              <div
+                className="joker-ladder"
+                aria-label={t("components.playModeView.jokerPrizeLadderAria")}
+              >
                 {getLadderValues(activeClue.pointValue).map((points, index) => {
-                  const rung = JOKER_STEP_COUNT - index
-                  const isActiveRung = !jokerRound.thiefHit && getCurrentJokerRungForDisplay(jokerRound) === rung
+                  const rung = JOKER_STEP_COUNT - index;
+                  const isActiveRung =
+                    !jokerRound.thiefHit &&
+                    getCurrentJokerRungForDisplay(jokerRound) === rung;
                   return (
-                    <div key={points} className={`joker-ladder-rung ${isActiveRung ? 'active' : ''}`}>
-                      {points} {t('common.pointsShort')}
+                    <div
+                      key={points}
+                      className={`joker-ladder-rung ${isActiveRung ? "active" : ""}`}
+                    >
+                      {points} {t("common.pointsShort")}
                     </div>
-                  )
+                  );
                 })}
               </div>
             </div>
@@ -524,38 +619,76 @@ export default function PlayModeView(props: PlayModeViewProps) {
             <div className="joker-board-panel">
               <div className="joker-column-grid">
                 {jokerRound.steps.map((step, index) => {
-                  const isCurrent = jokerRound.status === 'playing' && index === jokerRound.currentStepIndex
-                  const isDone = step.choice !== null
-                  const canClick = isCurrent && jokerRound.status === 'playing' && !isBusy
+                  const isCurrent =
+                    jokerRound.status === "playing" &&
+                    index === jokerRound.currentStepIndex;
+                  const isDone = step.choice !== null;
+                  const canClick =
+                    isCurrent && jokerRound.status === "playing" && !isBusy;
 
                   return (
-                    <div key={index} className={`joker-column ${isCurrent ? 'current' : ''} ${isDone ? 'done' : ''}`}>
+                    <div
+                      key={index}
+                      className={`joker-column ${isCurrent ? "current" : ""} ${isDone ? "done" : ""}`}
+                    >
                       <button
                         type="button"
-                        className={`joker-orb-button top ${step.choice === 'up' ? `chosen ${getJokerOutcomeClass(step.outcome)}` : ''}`}
+                        className={`joker-orb-button top ${step.choice === "up" ? `chosen ${getJokerOutcomeClass(step.outcome)}` : ""}`}
                         disabled={!canClick}
-                        onClick={() => setJokerRound((current) => applyJokerChoice(current, 'up', activeClue.pointValue))}
+                        onClick={() =>
+                          setJokerRound((current) =>
+                            applyJokerChoice(
+                              current,
+                              "up",
+                              activeClue.pointValue,
+                            ),
+                          )
+                        }
                       >
-                        <span className="joker-orb-label">{t('components.playModeView.up')}</span>
-                        <span className="joker-orb-value">{step.choice === 'up' && step.revealedSpot ? renderJokerSpot(step.revealedSpot, t) : ''}</span>
+                        <span className="joker-orb-label">
+                          {t("components.playModeView.up")}
+                        </span>
+                        <span className="joker-orb-value">
+                          {step.choice === "up" && step.revealedSpot
+                            ? renderJokerSpot(step.revealedSpot, t)
+                            : ""}
+                        </span>
                       </button>
 
-                      <div className="joker-base-orb" aria-label={t('components.playModeView.baseDigitAria', { digit: step.baseDigit })}>
+                      <div
+                        className="joker-base-orb"
+                        aria-label={t("components.playModeView.baseDigitAria", {
+                          digit: step.baseDigit,
+                        })}
+                      >
                         {step.baseDigit}
                       </div>
 
                       <button
                         type="button"
-                        className={`joker-orb-button bottom ${step.choice === 'down' ? `chosen ${getJokerOutcomeClass(step.outcome)}` : ''}`}
+                        className={`joker-orb-button bottom ${step.choice === "down" ? `chosen ${getJokerOutcomeClass(step.outcome)}` : ""}`}
                         disabled={!canClick}
-                        onClick={() => setJokerRound((current) => applyJokerChoice(current, 'down', activeClue.pointValue))}
+                        onClick={() =>
+                          setJokerRound((current) =>
+                            applyJokerChoice(
+                              current,
+                              "down",
+                              activeClue.pointValue,
+                            ),
+                          )
+                        }
                       >
-                        <span className="joker-orb-label">{t('components.playModeView.down')}</span>
-                        <span className="joker-orb-value">{step.choice === 'down' && step.revealedSpot ? renderJokerSpot(step.revealedSpot, t) : ''}</span>
+                        <span className="joker-orb-label">
+                          {t("components.playModeView.down")}
+                        </span>
+                        <span className="joker-orb-value">
+                          {step.choice === "down" && step.revealedSpot
+                            ? renderJokerSpot(step.revealedSpot, t)
+                            : ""}
+                        </span>
                       </button>
-
                     </div>
-                  )
+                  );
                 })}
               </div>
             </div>
@@ -567,125 +700,173 @@ export default function PlayModeView(props: PlayModeViewProps) {
         <div className="question-reveal-backdrop" aria-hidden="true">
           <div className="question-reveal-stage">
             <div className="question-reveal-flash" />
-            <div className="question-reveal-burst-text">{t('components.playModeView.questionTime')}</div>
-            <div className="question-reveal-subtext">{t('components.playModeView.pointsLabel', { points: resolvedPointValue })}</div>
+            <div className="question-reveal-burst-text">
+              {t("components.playModeView.questionTime")}
+            </div>
+            <div className="question-reveal-subtext">
+              {t("components.playModeView.pointsLabel", {
+                points: resolvedPointValue,
+              })}
+            </div>
             <div className="question-reveal-curtain left" />
             <div className="question-reveal-curtain right" />
           </div>
         </div>
       )}
 
-      {activeClue && !genderRevealIsActive && !jokerIsActive && !isQuestionRevealTransitioning && (
-        <div className="modal-backdrop">
-          <div
-            className={`modal-card ${jokerRound?.status === 'completed' ? 'question-reveal-modal' : ''}`}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="play-modal-title"
-          >
-            <h3 id="play-modal-title">
-              {t('components.playModeView.questionForPoints', { points: resolvedPointValue })}
-              {genderRevealBonusPointsForClue > 0 ? ` ${t('components.playModeView.includesRevealBonus', { points: genderRevealBonusPointsForClue })}` : ''}
-            </h3>
-            {jokerRound?.status === 'completed' && (
-              <p className={`message ${jokerRound.thiefHit ? 'error' : 'success'}`}>
-                {jokerRound.thiefHit
-                  ? t('components.playModeView.thiefHitResult')
-                  : jokerRound.jokerHit
-                    ? t('components.playModeView.jokerHitResult')
-                    : t('components.playModeView.jokerCompleteResult', { points: resolvedPointValue })}
-              </p>
-            )}
+      {activeClue &&
+        !genderRevealIsActive &&
+        !jokerIsActive &&
+        !isQuestionRevealTransitioning && (
+          <div className="modal-backdrop">
+            <div
+              className={`modal-card ${jokerRound?.status === "completed" ? "question-reveal-modal" : ""}`}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="play-modal-title"
+            >
+              <h3 id="play-modal-title">
+                {t("components.playModeView.questionForPoints", {
+                  points: resolvedPointValue,
+                })}
+                {genderRevealBonusPointsForClue > 0
+                  ? ` ${t("components.playModeView.includesRevealBonus", { points: genderRevealBonusPointsForClue })}`
+                  : ""}
+              </h3>
+              {jokerRound?.status === "completed" && (
+                <p
+                  className={`message ${jokerRound.thiefHit ? "error" : "success"}`}
+                >
+                  {jokerRound.thiefHit
+                    ? t("components.playModeView.thiefHitResult")
+                    : jokerRound.jokerHit
+                      ? t("components.playModeView.jokerHitResult")
+                      : t("components.playModeView.jokerCompleteResult", {
+                          points: resolvedPointValue,
+                        })}
+                </p>
+              )}
 
-            {getClueImageSrc(activeClue) && (
-              <div className="play-clue-image-wrap">
-                <img className="play-clue-image" src={getClueImageSrc(activeClue)!} alt={t('components.playModeView.questionVisualAlt')} />
+              {getClueImageSrc(activeClue) && (
+                <div className="play-clue-image-wrap">
+                  <img
+                    className="play-clue-image"
+                    src={getClueImageSrc(activeClue)!}
+                    alt={t("components.playModeView.questionVisualAlt")}
+                  />
+                </div>
+              )}
+              <p>{activeClue.prompt}</p>
+
+              <p>
+                {t("components.playModeView.currentTeamLabel")}:{" "}
+                <strong>
+                  {currentTeam?.name ?? t("components.playModeView.noneTeam")}
+                </strong>
+              </p>
+
+              <div className="field">
+                <label htmlFor="play-answer">
+                  {t("components.playModeView.answerLabel")}
+                </label>
+                <input
+                  id="play-answer"
+                  value={answerInput}
+                  onChange={(event) => setAnswerInput(event.target.value)}
+                  placeholder={t(
+                    "components.playModeView.typeAnswerPlaceholder",
+                  )}
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
+                />
               </div>
-            )}
-            <p>{activeClue.prompt}</p>
 
-            <p>
-              {t('components.playModeView.currentTeamLabel')}: <strong>{currentTeam?.name ?? t('components.playModeView.noneTeam')}</strong>
-            </p>
-
-            <div className="field">
-              <label htmlFor="play-answer">{t('components.playModeView.answerLabel')}</label>
-              <input
-                id="play-answer"
-                value={answerInput}
-                onChange={(event) => setAnswerInput(event.target.value)}
-                placeholder={t('components.playModeView.typeAnswerPlaceholder')}
-                autoComplete="off"
-                autoCorrect="off"
-                autoCapitalize="off"
-                spellCheck={false}
-              />
-            </div>
-
-            <div className="row play-answer-actions">
-              <button
-                className="btn-success"
-                disabled={isBusy || !currentTeamId || !answerInput.trim() || hasSubmitted}
-                onClick={async () => {
-                  const isCorrect = normalize(answerInput) === normalize(activeClue.answer)
-                  setFeedback(
-                    isCorrect
-                      ? genderRevealBonusPointsForClue > 0
-                        ? t('components.playModeView.correctAnswerWithBonusFeedback', {
-                            points: resolvedPointValue,
-                            bonus: genderRevealBonusPointsForClue,
-                          })
-                        : t('components.playModeView.correctAnswerFeedback')
-                      : t('components.playModeView.wrongAnswerFeedback', { answer: activeClue.answer }),
-                  )
-                  setFeedbackTone(isCorrect ? 'success' : 'error')
-                  setHasSubmitted(true)
-                  await onResolveQuestion({
-                    clue: activeClue,
-                    teamId: currentTeamId,
-                    isCorrect,
-                    resolvedPointValue,
-                  })
-
-                  const currentIndex = turnOrderTeams.findIndex((team) => team.id === currentTeamId)
-                  if (currentIndex >= 0 && turnOrderTeams.length > 0) {
-                    const nextIndex = (currentIndex + 1) % turnOrderTeams.length
-                    onCurrentTeamIdChange(turnOrderTeams[nextIndex].id)
+              <div className="row play-answer-actions">
+                <button
+                  className="btn-success"
+                  disabled={
+                    isBusy ||
+                    !currentTeamId ||
+                    !answerInput.trim() ||
+                    hasSubmitted
                   }
-                }}
-              >
-                {t('components.playModeView.submitAnswer')}
-              </button>
-              <button
-                className="btn-secondary"
-                type="button"
-                disabled={!hasSubmitted || isBusy}
-                onClick={() => {
-                  resetActiveQuestionFlow()
-                }}
-              >
-                {t('components.playModeView.close')}
-              </button>
-            </div>
+                  onClick={async () => {
+                    const isCorrect =
+                      normalize(answerInput) === normalize(activeClue.answer);
+                    setFeedback(
+                      isCorrect
+                        ? genderRevealBonusPointsForClue > 0
+                          ? t(
+                              "components.playModeView.correctAnswerWithBonusFeedback",
+                              {
+                                points: resolvedPointValue,
+                                bonus: genderRevealBonusPointsForClue,
+                              },
+                            )
+                          : t("components.playModeView.correctAnswerFeedback")
+                        : t("components.playModeView.wrongAnswerFeedback", {
+                            answer: activeClue.answer,
+                          }),
+                    );
+                    setFeedbackTone(isCorrect ? "success" : "error");
+                    setHasSubmitted(true);
+                    await onResolveQuestion({
+                      clue: activeClue,
+                      teamId: currentTeamId,
+                      isCorrect,
+                      resolvedPointValue,
+                    });
 
-            {feedback && (
-              <p className={`message ${feedbackTone}`} aria-live="polite">
-                {feedback}
-              </p>
-            )}
+                    const currentIndex = turnOrderTeams.findIndex(
+                      (team) => team.id === currentTeamId,
+                    );
+                    if (currentIndex >= 0 && turnOrderTeams.length > 0) {
+                      const nextIndex =
+                        (currentIndex + 1) % turnOrderTeams.length;
+                      onCurrentTeamIdChange(turnOrderTeams[nextIndex].id);
+                    }
+                  }}
+                >
+                  {t("components.playModeView.submitAnswer")}
+                </button>
+                <button
+                  className="btn-secondary"
+                  type="button"
+                  disabled={!hasSubmitted || isBusy}
+                  onClick={() => {
+                    resetActiveQuestionFlow();
+                  }}
+                >
+                  {t("components.playModeView.close")}
+                </button>
+              </div>
+
+              {feedback && (
+                <p className={`message ${feedbackTone}`} aria-live="polite">
+                  {feedback}
+                </p>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
       {scoreOrderedTeams.length > 0 && (
         <>
-          <h3>{t('components.playModeView.currentScores')}</h3>
+          <h3>{t("components.playModeView.currentScores")}</h3>
           <ul className="list compact-list">
             {scoreOrderedTeams.map((team) => (
-              <li key={team.id} className={`row ${team.id === currentTeamId ? 'current-turn' : ''}`}>
+              <li
+                key={team.id}
+                className={`row ${team.id === currentTeamId ? "current-turn" : ""}`}
+              >
                 <strong>{team.name}</strong>
                 <span>
-                  {team.score} {t('common.pointsShort')}{team.id === currentTeamId ? ` ${t('components.playModeView.turnSuffix')}` : ''}
+                  {team.score} {t("common.pointsShort")}
+                  {team.id === currentTeamId
+                    ? ` ${t("components.playModeView.turnSuffix")}`
+                    : ""}
                 </span>
               </li>
             ))}
@@ -693,135 +874,167 @@ export default function PlayModeView(props: PlayModeViewProps) {
         </>
       )}
     </section>
-  )
+  );
 }
 
 function normalize(value: string): string {
   return value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, ' ')
-    .replace(/\b(a|an|the)\b/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\b(a|an|the)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function getClueImageSrc(clue: Clue): string | null {
   if (!clue.imageMimeType || !clue.imageBase64) {
-    return null
+    return null;
   }
 
-  return `data:${clue.imageMimeType};base64,${clue.imageBase64}`
+  return `data:${clue.imageMimeType};base64,${clue.imageBase64}`;
 }
 
-function createJokerRound(basePoints: number, options?: { jokerSpotCount?: number; thiefSpotCount?: number }): JokerRoundState {
-  const totalSpots = JOKER_STEP_COUNT * 2
-  const jokerSpotCount = Math.max(0, Math.min(totalSpots, Math.floor(options?.jokerSpotCount ?? 1)))
-  const thiefSpotCountRequested = Math.max(0, Math.floor(options?.thiefSpotCount ?? 1))
-  const thiefSpotCount = Math.min(totalSpots - jokerSpotCount, thiefSpotCountRequested)
-  const shuffledPositions = shuffleNumbers(Array.from({ length: totalSpots }, (_, i) => i))
-  const jokerPositionSet = new Set(shuffledPositions.slice(0, jokerSpotCount))
-  const thiefPositionSet = new Set(shuffledPositions.slice(jokerSpotCount, jokerSpotCount + thiefSpotCount))
+function createJokerRound(
+  basePoints: number,
+  options?: { jokerSpotCount?: number; thiefSpotCount?: number },
+): JokerRoundState {
+  const totalSpots = JOKER_STEP_COUNT * 2;
+  const jokerSpotCount = Math.max(
+    0,
+    Math.min(totalSpots, Math.floor(options?.jokerSpotCount ?? 1)),
+  );
+  const thiefSpotCountRequested = Math.max(
+    0,
+    Math.floor(options?.thiefSpotCount ?? 1),
+  );
+  const thiefSpotCount = Math.min(
+    totalSpots - jokerSpotCount,
+    thiefSpotCountRequested,
+  );
+  const shuffledPositions = shuffleNumbers(
+    Array.from({ length: totalSpots }, (_, i) => i),
+  );
+  const jokerPositionSet = new Set(shuffledPositions.slice(0, jokerSpotCount));
+  const thiefPositionSet = new Set(
+    shuffledPositions.slice(jokerSpotCount, jokerSpotCount + thiefSpotCount),
+  );
 
-  const steps: JokerStep[] = Array.from({ length: JOKER_STEP_COUNT }, (_, index) => ({
-    baseDigit: randomDigit(),
-    upSpot: createJokerSpot(index * 2, jokerPositionSet, thiefPositionSet),
-    downSpot: createJokerSpot(index * 2 + 1, jokerPositionSet, thiefPositionSet),
-    choice: null,
-    revealedSpot: null,
-    outcome: null,
-  }))
+  const steps: JokerStep[] = Array.from(
+    { length: JOKER_STEP_COUNT },
+    (_, index) => ({
+      baseDigit: randomDigit(),
+      upSpot: createJokerSpot(index * 2, jokerPositionSet, thiefPositionSet),
+      downSpot: createJokerSpot(
+        index * 2 + 1,
+        jokerPositionSet,
+        thiefPositionSet,
+      ),
+      choice: null,
+      revealedSpot: null,
+      outcome: null,
+    }),
+  );
 
   return {
     steps,
     currentStepIndex: 0,
     currentRung: 0,
-    status: 'playing',
+    status: "playing",
     finalPoints: null,
     jokerHit: false,
     thiefHit: false,
     lastMessage: `Choose UP or DOWN for step 1. Base clue value: ${basePoints} points.`,
-  }
+  };
 }
 
 function createGenderRevealRound(): GenderRevealRoundState {
   return {
-    status: 'guessing',
+    status: "guessing",
     guessedGender: null,
     actualGender: GENDER_REVEAL_RESULT,
     isCorrect: null,
-    bonusStatus: 'idle',
-    bonusMessage: '',
-  }
+    bonusStatus: "idle",
+    bonusMessage: "",
+  };
 }
 
-function applyJokerChoice(current: JokerRoundState | null, choice: JokerDirection, basePoints: number): JokerRoundState | null {
-  if (!current || current.status !== 'playing') {
-    return current
+function applyJokerChoice(
+  current: JokerRoundState | null,
+  choice: JokerDirection,
+  basePoints: number,
+): JokerRoundState | null {
+  if (!current || current.status !== "playing") {
+    return current;
   }
 
-  const stepIndex = current.currentStepIndex
-  const step = current.steps[stepIndex]
+  const stepIndex = current.currentStepIndex;
+  const step = current.steps[stepIndex];
   if (!step || step.choice !== null) {
-    return current
+    return current;
   }
 
-  const revealedSpot = choice === 'up' ? step.upSpot : step.downSpot
-  const nextSteps = [...current.steps]
-  let nextRung = current.currentRung
+  const revealedSpot = choice === "up" ? step.upSpot : step.downSpot;
+  const nextSteps = [...current.steps];
+  let nextRung = current.currentRung;
 
-  if (revealedSpot.kind === 'joker') {
-    nextSteps[stepIndex] = { ...step, choice, revealedSpot, outcome: 'joker' }
+  if (revealedSpot.kind === "joker") {
+    nextSteps[stepIndex] = { ...step, choice, revealedSpot, outcome: "joker" };
     return {
       ...current,
       steps: nextSteps,
-      status: 'completed',
+      status: "completed",
       currentStepIndex: stepIndex,
       currentRung: JOKER_STEP_COUNT,
       finalPoints: getLadderPointValue(basePoints, JOKER_STEP_COUNT),
       jokerHit: true,
       thiefHit: false,
-      lastMessage: 'JOKER! Instant top prize. The question will now be revealed.',
-    }
+      lastMessage:
+        "JOKER! Instant top prize. The question will now be revealed.",
+    };
   }
 
-  if (revealedSpot.kind === 'thief') {
-    nextSteps[stepIndex] = { ...step, choice, revealedSpot, outcome: 'thief' }
+  if (revealedSpot.kind === "thief") {
+    nextSteps[stepIndex] = { ...step, choice, revealedSpot, outcome: "thief" };
     return {
       ...current,
       steps: nextSteps,
-      status: 'completed',
+      status: "completed",
       currentStepIndex: stepIndex,
       currentRung: 0,
       finalPoints: JOKER_THIEF_POINTS,
       jokerHit: false,
       thiefHit: true,
       lastMessage: `THIEF! The clue is reduced to ${JOKER_THIEF_POINTS} points if answered correctly.`,
-    }
+    };
   }
 
-  const outcome = evaluateNumberOutcome(step.baseDigit, revealedSpot.value, choice)
-  if (outcome === 'climb') {
-    nextRung = Math.min(JOKER_STEP_COUNT, current.currentRung + 1)
+  const outcome = evaluateNumberOutcome(
+    step.baseDigit,
+    revealedSpot.value,
+    choice,
+  );
+  if (outcome === "climb") {
+    nextRung = Math.min(JOKER_STEP_COUNT, current.currentRung + 1);
   }
-  if (outcome === 'down') {
-    nextRung = Math.max(0, current.currentRung - 1)
+  if (outcome === "down") {
+    nextRung = Math.max(0, current.currentRung - 1);
   }
 
-  nextSteps[stepIndex] = { ...step, choice, revealedSpot, outcome }
-  const isFinalStep = stepIndex === current.steps.length - 1
+  nextSteps[stepIndex] = { ...step, choice, revealedSpot, outcome };
+  const isFinalStep = stepIndex === current.steps.length - 1;
   if (isFinalStep) {
-    const finalPoints = getLadderPointValue(basePoints, nextRung)
+    const finalPoints = getLadderPointValue(basePoints, nextRung);
     return {
       ...current,
       steps: nextSteps,
-      status: 'completed',
+      status: "completed",
       currentStepIndex: stepIndex,
       currentRung: nextRung,
       finalPoints,
       lastMessage: `Joker complete. Final clue value: ${finalPoints} points.`,
-    }
+    };
   }
 
   return {
@@ -830,103 +1043,115 @@ function applyJokerChoice(current: JokerRoundState | null, choice: JokerDirectio
     currentStepIndex: stepIndex + 1,
     currentRung: nextRung,
     lastMessage: `${describeJokerOutcome(outcome)} Next: step ${stepIndex + 2}. Current value ${getLadderPointValue(basePoints, nextRung)}.`,
-  }
+  };
 }
 
-function evaluateNumberOutcome(baseDigit: number, revealedDigit: number, choice: JokerDirection): JokerOutcome {
+function evaluateNumberOutcome(
+  baseDigit: number,
+  revealedDigit: number,
+  choice: JokerDirection,
+): JokerOutcome {
   if (revealedDigit === baseDigit) {
-    return 'stay'
+    return "stay";
   }
 
-  if (choice === 'up') {
-    return revealedDigit > baseDigit ? 'climb' : 'down'
+  if (choice === "up") {
+    return revealedDigit > baseDigit ? "climb" : "down";
   }
 
-  return revealedDigit < baseDigit ? 'climb' : 'down'
+  return revealedDigit < baseDigit ? "climb" : "down";
 }
 
 function describeJokerOutcome(outcome: JokerOutcome | null): string {
   switch (outcome) {
-    case 'climb':
-      return 'Correct - climb'
-    case 'down':
-      return 'Wrong - down one'
-    case 'stay':
-      return 'Tie - stay'
-    case 'joker':
-      return 'Joker'
-    case 'thief':
-      return 'Thief'
+    case "climb":
+      return "Correct - climb";
+    case "down":
+      return "Wrong - down one";
+    case "stay":
+      return "Tie - stay";
+    case "joker":
+      return "Joker";
+    case "thief":
+      return "Thief";
     default:
-      return ''
+      return "";
   }
 }
 
 function renderJokerSpot(spot: JokerSpot, t: TFunction): string {
-  if (spot.kind === 'number') {
-    return String(spot.value)
+  if (spot.kind === "number") {
+    return String(spot.value);
   }
 
-  return spot.kind === 'joker' ? t('components.playModeView.jokerWord') : t('components.playModeView.thiefWord')
+  return spot.kind === "joker"
+    ? t("components.playModeView.jokerWord")
+    : t("components.playModeView.thiefWord");
 }
 
 function getJokerOutcomeClass(outcome: JokerOutcome | null): string {
   switch (outcome) {
-    case 'climb':
-      return 'outcome-climb'
-    case 'down':
-      return 'outcome-down'
-    case 'stay':
-      return 'outcome-stay'
-    case 'joker':
-      return 'outcome-joker'
-    case 'thief':
-      return 'outcome-thief'
+    case "climb":
+      return "outcome-climb";
+    case "down":
+      return "outcome-down";
+    case "stay":
+      return "outcome-stay";
+    case "joker":
+      return "outcome-joker";
+    case "thief":
+      return "outcome-thief";
     default:
-      return ''
+      return "";
   }
 }
 
 function getLadderPointValue(basePoints: number, rung: number): number {
-  return basePoints + rung * JOKER_LADDER_STEP_POINTS
+  return basePoints + rung * JOKER_LADDER_STEP_POINTS;
 }
 
 function getLadderValues(basePoints: number): number[] {
-  return Array.from({ length: JOKER_STEP_COUNT + 1 }, (_, index) => getLadderPointValue(basePoints, JOKER_STEP_COUNT - index))
+  return Array.from({ length: JOKER_STEP_COUNT + 1 }, (_, index) =>
+    getLadderPointValue(basePoints, JOKER_STEP_COUNT - index),
+  );
 }
 
 function getCurrentJokerRungForDisplay(round: JokerRoundState): number {
   if (round.jokerHit) {
-    return JOKER_STEP_COUNT
+    return JOKER_STEP_COUNT;
   }
 
-  return round.currentRung
+  return round.currentRung;
 }
 
-function createJokerSpot(position: number, jokerPositions: Set<number>, thiefPositions: Set<number>): JokerSpot {
+function createJokerSpot(
+  position: number,
+  jokerPositions: Set<number>,
+  thiefPositions: Set<number>,
+): JokerSpot {
   if (jokerPositions.has(position)) {
-    return { kind: 'joker' }
+    return { kind: "joker" };
   }
 
   if (thiefPositions.has(position)) {
-    return { kind: 'thief' }
+    return { kind: "thief" };
   }
 
-  return { kind: 'number', value: randomDigit() }
+  return { kind: "number", value: randomDigit() };
 }
 
 function randomDigit(): number {
-  return Math.floor(Math.random() * 10)
+  return Math.floor(Math.random() * 10);
 }
 
 function shuffleNumbers(values: number[]): number[] {
-  const next = [...values]
+  const next = [...values];
   for (let i = next.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(Math.random() * (i + 1))
-    const current = next[i]
-    next[i] = next[j]
-    next[j] = current
+    const j = Math.floor(Math.random() * (i + 1));
+    const current = next[i];
+    next[i] = next[j];
+    next[j] = current;
   }
 
-  return next
+  return next;
 }

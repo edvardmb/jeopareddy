@@ -26,9 +26,21 @@
 .neon-hero-main {
   padding: 1.1rem 1.2rem;
   background:
-    radial-gradient(circle at 8% 15%, rgba(255, 77, 166, 0.18) 0%, transparent 40%),
-    radial-gradient(circle at 88% 18%, rgba(108, 77, 255, 0.16) 0%, transparent 45%),
-    radial-gradient(circle at 80% 88%, rgba(45, 216, 129, 0.1) 0%, transparent 38%),
+    radial-gradient(
+      circle at 8% 15%,
+      rgba(255, 77, 166, 0.18) 0%,
+      transparent 40%
+    ),
+    radial-gradient(
+      circle at 88% 18%,
+      rgba(108, 77, 255, 0.16) 0%,
+      transparent 45%
+    ),
+    radial-gradient(
+      circle at 80% 88%,
+      rgba(45, 216, 129, 0.1) 0%,
+      transparent 38%
+    ),
     #0f1020;
 }
 
@@ -67,7 +79,9 @@
   font-weight: 800;
   padding: 0.65rem 0.9rem;
   cursor: default;
-  box-shadow: 0 0 0 1px rgba(20, 90, 242, 0.25), 0 6px 14px rgba(20, 90, 242, 0.28);
+  box-shadow:
+    0 0 0 1px rgba(20, 90, 242, 0.25),
+    0 6px 14px rgba(20, 90, 242, 0.28);
 }
 
 .neon-hero-actions button.secondary {
@@ -79,8 +93,16 @@
 .neon-hero-side {
   padding: 1rem;
   background:
-    radial-gradient(circle at 100% 0%, rgba(255, 210, 63, 0.18) 0%, transparent 40%),
-    radial-gradient(circle at 0% 100%, rgba(255, 77, 166, 0.12) 0%, transparent 40%),
+    radial-gradient(
+      circle at 100% 0%,
+      rgba(255, 210, 63, 0.18) 0%,
+      transparent 40%
+    ),
+    radial-gradient(
+      circle at 0% 100%,
+      rgba(255, 77, 166, 0.12) 0%,
+      transparent 40%
+    ),
     #111226;
   display: grid;
   gap: 0.75rem;
@@ -153,7 +175,7 @@
 }
 
 .neon-panel::before {
-  content: '';
+  content: "";
   position: absolute;
   inset: 0 auto 0 0;
   width: 5px;
@@ -190,7 +212,11 @@
   border-radius: 16px;
   padding: 0.8rem;
   background:
-    radial-gradient(circle at 100% 0%, rgba(45, 216, 129, 0.2) 0%, transparent 45%),
+    radial-gradient(
+      circle at 100% 0%,
+      rgba(45, 216, 129, 0.2) 0%,
+      transparent 45%
+    ),
     rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(45, 216, 129, 0.28);
   display: grid;
@@ -211,8 +237,16 @@
 .neon-board-card {
   padding: 1rem;
   background:
-    radial-gradient(circle at 0% 100%, rgba(108, 77, 255, 0.15) 0%, transparent 40%),
-    radial-gradient(circle at 100% 0%, rgba(255, 77, 166, 0.12) 0%, transparent 35%),
+    radial-gradient(
+      circle at 0% 100%,
+      rgba(108, 77, 255, 0.15) 0%,
+      transparent 40%
+    ),
+    radial-gradient(
+      circle at 100% 0%,
+      rgba(255, 77, 166, 0.12) 0%,
+      transparent 35%
+    ),
     #0f1020;
 }
 
@@ -323,8 +357,16 @@
   width: min(640px, 100%);
   padding: 1rem;
   background:
-    radial-gradient(circle at 100% 0%, rgba(255, 210, 63, 0.14) 0%, transparent 42%),
-    radial-gradient(circle at 0% 100%, rgba(255, 77, 166, 0.1) 0%, transparent 38%),
+    radial-gradient(
+      circle at 100% 0%,
+      rgba(255, 210, 63, 0.14) 0%,
+      transparent 42%
+    ),
+    radial-gradient(
+      circle at 0% 100%,
+      rgba(255, 77, 166, 0.1) 0%,
+      transparent 38%
+    ),
     #101223;
 }
 

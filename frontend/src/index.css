@@ -9,8 +9,7 @@ body {
   line-height: 1.45;
   background:
     radial-gradient(circle at top right, #dbeafe 0%, transparent 38%),
-    radial-gradient(circle at bottom left, #e9f5ff 0%, transparent 30%),
-    #eef3fb;
+    radial-gradient(circle at bottom left, #e9f5ff 0%, transparent 30%), #eef3fb;
   color: #102a43;
 }
 

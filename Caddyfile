@@ -1,4 +1,8 @@
-https://192.168.0.128 {
+:443 {
     tls internal
     reverse_proxy frontend:80
+}
+
+:80 {
+    redir https://{host}{uri}
 }

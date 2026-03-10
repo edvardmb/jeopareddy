@@ -2,7 +2,11 @@
     default_sni 192.168.0.127
 }
 
-https://192.168.0.127 {
+https://192.168.0.127, https://84.210.146.56, https://localhost {
     tls internal
     reverse_proxy frontend:80
+}
+
+http://192.168.0.127, http://84.210.146.56, http://localhost {
+    redir https://{host}{uri}
 }

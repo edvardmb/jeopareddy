@@ -1,5 +1,6 @@
 import { Team } from "../api";
 import { useTranslation } from "react-i18next";
+import { Box, Button, Heading, Text } from "@chakra-ui/react";
 
 type TeamsCardProps = {
   teams: Team[];
@@ -25,26 +26,31 @@ export default function TeamsCard(props: TeamsCardProps) {
   );
 
   return (
-    <section className="card card-scoreboard">
-      <h2>{t("components.teamsCard.title")}</h2>
+    <Box as="section" className="card card-scoreboard">
+      <Heading as="h2" size="md">
+        {t("components.teamsCard.title")}
+      </Heading>
       {rankedTeams.length === 0 ? (
-        <p className="muted">{t("components.teamsCard.noTeams")}</p>
+        <Text className="muted">{t("components.teamsCard.noTeams")}</Text>
       ) : (
-        <ul className="list scoreboard-list">
+        <Box as="ul" className="list scoreboard-list">
           {rankedTeams.map((team, index) => (
-            <li
+            <Box
+              as="li"
               key={team.id}
               className={`scoreboard-item ${team.id === currentTurnTeamId ? "current-turn" : ""}`}
             >
-              <span className="scoreboard-rank">{index + 1}</span>
-              <strong>{team.name}</strong>
-              <span className="scoreboard-points">
+              <Text as="span" className="scoreboard-rank">
+                {index + 1}
+              </Text>
+              <Box as="strong">{team.name}</Box>
+              <Text as="span" className="scoreboard-points">
                 {team.score} {t("common.pointsShort")}
-              </span>
+              </Text>
               {(onSetTurnTeamId || (isDraft && onDeleteTeam)) && (
-                <div className="scoreboard-actions">
+                <Box className="scoreboard-actions">
                   {onSetTurnTeamId && (
-                    <button
+                    <Button
                       type="button"
                       className={
                         team.id === currentTurnTeamId
@@ -60,10 +66,10 @@ export default function TeamsCard(props: TeamsCardProps) {
                       {team.id === currentTurnTeamId
                         ? t("components.teamsCard.turn")
                         : t("components.teamsCard.setTurn")}
-                    </button>
+                    </Button>
                   )}
                   {isDraft && onDeleteTeam && (
-                    <button
+                    <Button
                       type="button"
                       className="btn-danger scoreboard-remove-btn"
                       disabled={isBusy}
@@ -76,14 +82,14 @@ export default function TeamsCard(props: TeamsCardProps) {
                       })}
                     >
                       {t("common.remove")}
-                    </button>
+                    </Button>
                   )}
-                </div>
+                </Box>
               )}
-            </li>
+            </Box>
           ))}
-        </ul>
+        </Box>
       )}
-    </section>
+    </Box>
   );
 }

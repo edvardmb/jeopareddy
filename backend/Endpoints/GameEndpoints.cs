@@ -17,14 +17,42 @@ public static class GameEndpoints
 
     public static IEndpointRouteBuilder MapGameEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapGet("/api/games", ListGamesAsync);
-        app.MapPost("/api/games", CreateGameAsync);
-        app.MapGet("/api/games/{gameId:guid}", GetGameAsync);
-        app.MapPost("/api/games/{gameId:guid}/categories", CreateCategoryAsync);
-        app.MapPatch("/api/games/{gameId:guid}/categories/{categoryId:guid}", UpdateCategoryAsync);
-        app.MapDelete("/api/games/{gameId:guid}/categories/{categoryId:guid}", DeleteCategoryAsync);
-        app.MapPost("/api/games/{gameId:guid}/start", StartGameAsync);
-        app.MapPost("/api/games/{gameId:guid}/reset", ResetGameAsync);
+        app.MapGet("/api/games", ListGamesAsync)
+            .Produces<IReadOnlyList<GameListItemResponse>>(StatusCodes.Status200OK);
+
+        app.MapPost("/api/games", CreateGameAsync)
+            .Produces<GameResponse>(StatusCodes.Status201Created)
+            .ProducesValidationProblem(StatusCodes.Status400BadRequest);
+
+        app.MapGet("/api/games/{gameId:guid}", GetGameAsync)
+            .Produces<GameResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
+
+        app.MapPost("/api/games/{gameId:guid}/categories", CreateCategoryAsync)
+            .Produces<CategoryCreatedResponse>(StatusCodes.Status201Created)
+            .ProducesValidationProblem(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
+
+        app.MapPatch("/api/games/{gameId:guid}/categories/{categoryId:guid}", UpdateCategoryAsync)
+            .Produces(StatusCodes.Status204NoContent)
+            .ProducesValidationProblem(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
+
+        app.MapDelete("/api/games/{gameId:guid}/categories/{categoryId:guid}", DeleteCategoryAsync)
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
+
+        app.MapPost("/api/games/{gameId:guid}/start", StartGameAsync)
+            .Produces<StartGameResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
+
+        app.MapPost("/api/games/{gameId:guid}/reset", ResetGameAsync)
+            .Produces<ResetGameResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
+
         return app;
     }
 

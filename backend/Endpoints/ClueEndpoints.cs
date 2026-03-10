@@ -9,9 +9,22 @@ public static class ClueEndpoints
 {
     public static IEndpointRouteBuilder MapClueEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapPatch("/api/games/{gameId:guid}/clues/{clueId:guid}", UpdateClueAsync);
-        app.MapPatch("/api/games/{gameId:guid}/clues/{clueId:guid}/content", UpdateClueContentAsync);
-        app.MapDelete("/api/games/{gameId:guid}/clues/{clueId:guid}", DeleteClueAsync);
+        app.MapPatch("/api/games/{gameId:guid}/clues/{clueId:guid}", UpdateClueAsync)
+            .Produces<ClueResponse>(StatusCodes.Status200OK)
+            .ProducesValidationProblem(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
+        app.MapPatch("/api/games/{gameId:guid}/clues/{clueId:guid}/content", UpdateClueContentAsync)
+            .Produces(StatusCodes.Status204NoContent)
+            .ProducesValidationProblem(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
+
+        app.MapDelete("/api/games/{gameId:guid}/clues/{clueId:guid}", DeleteClueAsync)
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
+
         return app;
     }
 

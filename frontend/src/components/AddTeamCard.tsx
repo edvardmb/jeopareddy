@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import { Box, Button, Heading, Input, Text } from "@chakra-ui/react";
 
 type AddTeamCardProps = {
   teamName: string;
@@ -22,35 +23,37 @@ export default function AddTeamCard(props: AddTeamCardProps) {
   const isDisabled = isBusy || !canOperateOnGame || isLocked;
 
   return (
-    <section className={`card card-green ${isLocked ? "card-disabled" : ""}`}>
-      <h2>{t("components.addTeamCard.title")}</h2>
-      <p className="muted">{t("components.addTeamCard.subtitle")}</p>
+    <Box as="section" className={`card card-green ${isLocked ? "card-disabled" : ""}`}>
+      <Heading as="h2" size="md">
+        {t("components.addTeamCard.title")}
+      </Heading>
+      <Text className="muted">{t("components.addTeamCard.subtitle")}</Text>
       {isLocked && (
-        <p className="tiny section-lock-note">
+        <Text className="tiny section-lock-note">
           {t("components.addTeamCard.locked")}
-        </p>
+        </Text>
       )}
-      <div className="grid">
-        <div className="field">
+      <Box className="grid">
+        <Box className="field">
           <label htmlFor="team-name">
             {t("components.addTeamCard.teamNameLabel")}
           </label>
-          <input
+          <Input
             id="team-name"
             value={teamName}
             onChange={(event) => onTeamNameChange(event.target.value)}
             placeholder={t("components.addTeamCard.teamNamePlaceholder")}
             disabled={isDisabled}
           />
-        </div>
-        <button
+        </Box>
+        <Button
           className="btn-success"
           disabled={isDisabled}
           onClick={onAddTeam}
         >
           {t("components.addTeamCard.saveTeam")}
-        </button>
-      </div>
-    </section>
+        </Button>
+      </Box>
+    </Box>
   );
 }

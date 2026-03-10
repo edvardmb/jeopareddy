@@ -1,6 +1,7 @@
 import { Game } from "../api";
 import { useTranslation } from "react-i18next";
 import { translateGameStatus } from "../i18nHelpers";
+import { Box, Button, Heading, Text } from "@chakra-ui/react";
 
 type CurrentGameCardProps = {
   game: Game;
@@ -14,27 +15,29 @@ export default function CurrentGameCard(props: CurrentGameCardProps) {
   const { game, isBusy, onStart, onReset } = props;
 
   return (
-    <section className="card card-green">
-      <h2>{t("components.currentGameCard.title")}</h2>
-      <p>
-        <strong>{game.title}</strong> ({game.id})
-      </p>
-      <p>
+    <Box as="section" className="card card-green">
+      <Heading as="h2" size="md">
+        {t("components.currentGameCard.title")}
+      </Heading>
+      <Text>
+        <Box as="strong">{game.title}</Box> ({game.id})
+      </Text>
+      <Text>
         {t("components.currentGameCard.statusLabel")}:{" "}
         {translateGameStatus(game.status, t)}
-      </p>
-      <div className="row">
-        <button
+      </Text>
+      <Box className="row">
+        <Button
           className="btn-success"
           disabled={isBusy || game.status !== "Draft"}
           onClick={onStart}
         >
           {t("components.currentGameCard.enterPlayMode")}
-        </button>
-        <button className="btn-danger" disabled={isBusy} onClick={onReset}>
+        </Button>
+        <Button className="btn-danger" disabled={isBusy} onClick={onReset}>
           {t("components.currentGameCard.resetGame")}
-        </button>
-      </div>
-    </section>
+        </Button>
+      </Box>
+    </Box>
   );
 }

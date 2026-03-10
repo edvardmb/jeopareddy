@@ -9,7 +9,11 @@ public static class ScoreEventEndpoints
 {
     public static IEndpointRouteBuilder MapScoreEventEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapPost("/api/games/{gameId:guid}/score-events", CreateScoreEventAsync);
+        app.MapPost("/api/games/{gameId:guid}/score-events", CreateScoreEventAsync)
+            .Produces<ScoreEventCreatedResponse>(StatusCodes.Status201Created)
+            .ProducesValidationProblem(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
         return app;
     }
 

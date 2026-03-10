@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import { Box, Text } from "@chakra-ui/react";
 
 type InfoHintProps = {
   text: string;
@@ -10,13 +11,18 @@ export default function InfoHint(props: InfoHintProps) {
   const { text, label = t("common.info") } = props;
 
   return (
-    <span className="info-hint" tabIndex={0} aria-label={`${label}: ${text}`}>
-      <span className="info-hint-icon" aria-hidden="true">
+    <Box
+      as="span"
+      className="info-hint"
+      tabIndex={0}
+      aria-label={`${label}: ${text}`}
+    >
+      <Text as="span" className="info-hint-icon" aria-hidden="true">
         i
-      </span>
-      <span className="info-hint-tooltip" role="tooltip">
+      </Text>
+      <Text as="span" className="info-hint-tooltip" role="tooltip">
         {text}
-      </span>
-    </span>
+      </Text>
+    </Box>
   );
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import InfoHint from "./InfoHint";
+import { Box, Button, Heading, Input, Text } from "@chakra-ui/react";
 
 const MAX_CLUE_IMAGE_BYTES = 1_048_576;
 const ALLOWED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/gif"] as const;
@@ -183,25 +184,27 @@ export default function AddCategoryCard(props: AddCategoryCardProps) {
   };
 
   return (
-    <section className={`card card-yellow ${isLocked ? "card-disabled" : ""}`}>
-      <h2>{t("components.addCategoryCard.title")}</h2>
-      <p className="muted">{t("components.addCategoryCard.subtitle")}</p>
-      <p className="tiny muted">{t("components.addCategoryCard.setupHint")}</p>
+    <Box as="section" className={`card card-yellow ${isLocked ? "card-disabled" : ""}`}>
+      <Heading as="h2" size="md">
+        {t("components.addCategoryCard.title")}
+      </Heading>
+      <Text className="muted">{t("components.addCategoryCard.subtitle")}</Text>
+      <Text className="tiny muted">{t("components.addCategoryCard.setupHint")}</Text>
       {isEditingQuestion && (
-        <p className="tiny">{t("components.addCategoryCard.editingHint")}</p>
+        <Text className="tiny">{t("components.addCategoryCard.editingHint")}</Text>
       )}
       {isLocked && (
-        <p className="tiny section-lock-note">
+        <Text className="tiny section-lock-note">
           {t("components.addCategoryCard.locked")}
-        </p>
+        </Text>
       )}
 
-      <div className="grid">
-        <div className="field">
+      <Box className="grid">
+        <Box className="field">
           <label htmlFor="category-name">
             {t("components.addCategoryCard.categoryNameLabel")}
           </label>
-          <input
+          <Input
             id="category-name"
             value={categoryName}
             onChange={(event) => onCategoryNameChange(event.target.value)}
@@ -210,9 +213,9 @@ export default function AddCategoryCard(props: AddCategoryCardProps) {
             )}
             disabled={isDisabled}
           />
-        </div>
-        <div className="field">
-          <div className="field-label-row">
+        </Box>
+        <Box className="field">
+          <Box className="field-label-row">
             <label htmlFor="category-order">
               {t("components.addCategoryCard.categoryOrderLabel")}
             </label>
@@ -220,8 +223,8 @@ export default function AddCategoryCard(props: AddCategoryCardProps) {
               text={t("components.addCategoryCard.categoryOrderHelp")}
               label={t("components.addCategoryCard.categoryOrderHelpLabel")}
             />
-          </div>
-          <input
+          </Box>
+          <Input
             id="category-order"
             value={categoryOrder}
             type="number"
@@ -234,15 +237,15 @@ export default function AddCategoryCard(props: AddCategoryCardProps) {
               "components.addCategoryCard.categoryOrderPlaceholder",
             )}
           />
-        </div>
-      </div>
+        </Box>
+      </Box>
 
-      <div className="grid">
-        <div className="field">
+      <Box className="grid">
+        <Box className="field">
           <label htmlFor="clue-prompt">
             {t("components.addCategoryCard.questionTextLabel")}
           </label>
-          <input
+          <Input
             id="clue-prompt"
             value={currentQuestion.prompt}
             disabled={isDisabled}
@@ -256,12 +259,12 @@ export default function AddCategoryCard(props: AddCategoryCardProps) {
               "components.addCategoryCard.questionTextPlaceholder",
             )}
           />
-        </div>
-        <div className="field">
+        </Box>
+        <Box className="field">
           <label htmlFor="clue-answer">
             {t("components.addCategoryCard.expectedAnswerLabel")}
           </label>
-          <input
+          <Input
             id="clue-answer"
             value={currentQuestion.answer}
             disabled={isDisabled}
@@ -275,8 +278,8 @@ export default function AddCategoryCard(props: AddCategoryCardProps) {
               "components.addCategoryCard.expectedAnswerPlaceholder",
             )}
           />
-        </div>
-        <div className="field">
+        </Box>
+        <Box className="field">
           <label htmlFor="clue-points">
             {t("components.addCategoryCard.questionValueLabel")}
           </label>
@@ -297,15 +300,15 @@ export default function AddCategoryCard(props: AddCategoryCardProps) {
               </option>
             ))}
           </select>
-          <div className="tiny muted">
+          <Text className="tiny muted">
             {t("components.addCategoryCard.onePerValue")}
-          </div>
-        </div>
-        <div className="field">
+          </Text>
+        </Box>
+        <Box className="field">
           <label htmlFor="clue-image">
             {t("components.addCategoryCard.questionImageLabel")}
           </label>
-          <input
+          <Input
             id="clue-image"
             type="file"
             accept=".png,.jpg,.jpeg,.gif,image/png,image/jpeg,image/gif"
@@ -315,25 +318,25 @@ export default function AddCategoryCard(props: AddCategoryCardProps) {
               event.currentTarget.value = "";
             }}
           />
-          <div className="tiny muted">
+          <Text className="tiny muted">
             {t("components.addCategoryCard.questionImageHelp", {
               maxSize: formatBytes(MAX_CLUE_IMAGE_BYTES),
             })}
-          </div>
-          {imageError && <div className="tiny inline-error">{imageError}</div>}
+          </Text>
+          {imageError && <Text className="tiny inline-error">{imageError}</Text>}
           {currentQuestion.image && (
-            <div className="clue-image-preview">
+            <Box className="clue-image-preview">
               <img
                 src={currentQuestion.image.previewUrl}
                 alt={t("components.addCategoryCard.previewAlt", {
                   fileName: currentQuestion.image.fileName,
                 })}
               />
-              <div className="tiny muted">
+              <Text className="tiny muted">
                 {currentQuestion.image.fileName} (
                 {formatBytes(currentQuestion.image.sizeBytes)})
-              </div>
-              <button
+              </Text>
+              <Button
                 className="btn-secondary"
                 type="button"
                 disabled={isDisabled}
@@ -346,16 +349,16 @@ export default function AddCategoryCard(props: AddCategoryCardProps) {
                 }}
               >
                 {t("components.addCategoryCard.removeImage")}
-              </button>
-            </div>
+              </Button>
+            </Box>
           )}
-        </div>
-      </div>
+        </Box>
+      </Box>
 
-      <div className="row">
+      <Box className="row">
         {isEditingQuestion ? (
           <>
-            <button
+            <Button
               className="btn-success"
               disabled={
                 isDisabled ||
@@ -388,8 +391,8 @@ export default function AddCategoryCard(props: AddCategoryCardProps) {
               }}
             >
               {t("components.addCategoryCard.saveEditedQuestion")}
-            </button>
-            <button
+            </Button>
+            <Button
               className="btn-secondary"
               disabled={isDisabled}
               type="button"
@@ -400,11 +403,11 @@ export default function AddCategoryCard(props: AddCategoryCardProps) {
               }}
             >
               {t("components.addCategoryCard.cancelEdit")}
-            </button>
+            </Button>
           </>
         ) : (
           <>
-            <button
+            <Button
               className="btn-secondary"
               disabled={
                 isDisabled ||
@@ -416,47 +419,47 @@ export default function AddCategoryCard(props: AddCategoryCardProps) {
               onClick={addQuestionToCategory}
             >
               {t("components.addCategoryCard.addQuestionToCategory")}
-            </button>
+            </Button>
             {hasDuplicateValue && (
-              <span className="tiny inline-error">
+              <Text as="span" className="tiny inline-error">
                 {t("components.addCategoryCard.duplicateValue")}
-              </span>
+              </Text>
             )}
           </>
         )}
-      </div>
+      </Box>
 
       {questions.length > 0 && (
         <>
-          <p className="muted">
+          <Text className="muted">
             {t("components.addCategoryCard.queuedQuestions")}
-          </p>
-          <ul className="list compact-list">
+          </Text>
+          <Box as="ul" className="list compact-list">
             {questions.map((question, index) => (
-              <li key={`${question.pointValue}-${index}`} className="row">
-                <div>
+              <Box as="li" key={`${question.pointValue}-${index}`} className="row">
+                <Box>
                   {question.pointValue} {t("common.pointsShort")} -{" "}
                   {question.prompt}
                   {question.image
                     ? ` ${t("components.boardCard.imageTag")}`
                     : ""}
-                </div>
-                <button
+                </Box>
+                <Button
                   className="btn-secondary"
                   type="button"
                   disabled={isDisabled}
                   onClick={() => removeQuestion(index)}
                 >
                   {t("common.remove")}
-                </button>
-              </li>
+                </Button>
+              </Box>
             ))}
-          </ul>
+          </Box>
         </>
       )}
 
-      <div className="row">
-        <button
+      <Box className="row">
+        <Button
           className="btn-success"
           disabled={isDisabled || questions.length === 0}
           onClick={async () => {
@@ -479,9 +482,9 @@ export default function AddCategoryCard(props: AddCategoryCardProps) {
           {t("components.addCategoryCard.saveCategoryWithCount", {
             count: questions.length,
           })}
-        </button>
-      </div>
-    </section>
+        </Button>
+      </Box>
+    </Box>
   );
 }
 

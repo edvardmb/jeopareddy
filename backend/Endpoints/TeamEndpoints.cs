@@ -9,8 +9,17 @@ public static class TeamEndpoints
 {
     public static IEndpointRouteBuilder MapTeamEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapPost("/api/games/{gameId:guid}/teams", CreateTeamAsync);
-        app.MapDelete("/api/games/{gameId:guid}/teams/{teamId:guid}", DeleteTeamAsync);
+        app.MapPost("/api/games/{gameId:guid}/teams", CreateTeamAsync)
+            .Produces<TeamCreatedResponse>(StatusCodes.Status201Created)
+            .ProducesValidationProblem(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
+
+        app.MapDelete("/api/games/{gameId:guid}/teams/{teamId:guid}", DeleteTeamAsync)
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
+
         return app;
     }
 

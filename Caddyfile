@@ -1,8 +1,8 @@
 {
-    default_sni 192.168.0.128
+    default_sni 192.168.0.127
 }
 
-https://192.168.0.128 {
+https://192.168.0.127 {
     tls internal
     reverse_proxy frontend:80
 }

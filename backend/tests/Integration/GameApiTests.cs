@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 
@@ -11,6 +12,7 @@ public sealed class GameApiTests
     {
         using var factory = new CustomWebApplicationFactory();
         using var client = factory.CreateClient();
+        await RegisterAndAuthenticateAsync(client);
 
         var response = await client.PostAsJsonAsync("/api/games", new { title = "Integration Test Game" });
 
@@ -22,6 +24,7 @@ public sealed class GameApiTests
     {
         using var factory = new CustomWebApplicationFactory();
         using var client = factory.CreateClient();
+        await RegisterAndAuthenticateAsync(client);
 
         var game = await CreateGameAsync(client, "Duplicate Team Order");
         await client.PostAsJsonAsync($"/api/games/{game.Id}/teams", new { name = "Team A", displayOrder = 1 });
@@ -35,6 +38,7 @@ public sealed class GameApiTests
     {
         using var factory = new CustomWebApplicationFactory();
         using var client = factory.CreateClient();
+        await RegisterAndAuthenticateAsync(client);
 
         var game = await CreateGameAsync(client, "Unknown Team Score");
         var response = await client.PostAsJsonAsync($"/api/games/{game.Id}/score-events", new
@@ -53,6 +57,7 @@ public sealed class GameApiTests
     {
         using var factory = new CustomWebApplicationFactory();
         using var client = factory.CreateClient();
+        await RegisterAndAuthenticateAsync(client);
 
         var game = await CreateGameAsync(client, "Patch Clue");
         var categoryResponse = await client.PostAsJsonAsync($"/api/games/{game.Id}/categories", new
@@ -88,6 +93,22 @@ public sealed class GameApiTests
         Assert.True(clue.IsAnswered);
     }
 
+    [Fact]
+    public async Task GetGame_OtherUserGame_ReturnsNotFound()
+    {
+        using var factory = new CustomWebApplicationFactory();
+        using var ownerClient = factory.CreateClient();
+        using var otherClient = factory.CreateClient();
+
+        await RegisterAndAuthenticateAsync(ownerClient, "owner@example.com");
+        await RegisterAndAuthenticateAsync(otherClient, "other@example.com");
+
+        var game = await CreateGameAsync(ownerClient, "Private Game");
+        var response = await otherClient.GetAsync($"/api/games/{game.Id}");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
     private static async Task<GameEnvelope> CreateGameAsync(HttpClient client, string title)
     {
         var response = await client.PostAsJsonAsync("/api/games", new { title });
@@ -104,7 +125,27 @@ public sealed class GameApiTests
         return game ?? throw new JsonException("Game response was null.");
     }
 
+    private static async Task RegisterAndAuthenticateAsync(HttpClient client, string email = "test@example.com")
+    {
+        var registerResponse = await client.PostAsJsonAsync("/api/auth/register", new
+        {
+            email,
+            displayName = "Integration User",
+            password = "TestPassw0rd!"
+        });
+        registerResponse.EnsureSuccessStatusCode();
+        var auth = await registerResponse.Content.ReadFromJsonAsync<AuthEnvelope>();
+        if (auth is null)
+        {
+            throw new JsonException("Auth response was null.");
+        }
+
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", auth.AccessToken);
+    }
+
     private sealed record GameEnvelope(Guid Id, string Title, List<CategoryEnvelope> Categories);
+    private sealed record AuthEnvelope(string AccessToken);
 
     private sealed record CategoryEnvelope(Guid Id, string Name, int DisplayOrder, List<ClueEnvelope> Clues);
 

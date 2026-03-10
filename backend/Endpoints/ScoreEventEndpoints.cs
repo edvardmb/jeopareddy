@@ -10,6 +10,7 @@ public static class ScoreEventEndpoints
     public static IEndpointRouteBuilder MapScoreEventEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapPost("/api/games/{gameId:guid}/score-events", CreateScoreEventAsync)
+            .RequireAuthorization()
             .Produces<ScoreEventCreatedResponse>(StatusCodes.Status201Created)
             .ProducesValidationProblem(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
@@ -17,8 +18,14 @@ public static class ScoreEventEndpoints
         return app;
     }
 
-    private static async Task<IResult> CreateScoreEventAsync(Guid gameId, CreateScoreEventRequest request, JeopareddyDbContext db)
+    private static async Task<IResult> CreateScoreEventAsync(Guid gameId, CreateScoreEventRequest request, HttpContext httpContext, JeopareddyDbContext db)
     {
+        var userId = EndpointOwnership.TryGetUserId(httpContext);
+        if (userId is null)
+        {
+            return Results.Unauthorized();
+        }
+
         if (request.DeltaPoints == 0)
         {
             return Results.ValidationProblem(new Dictionary<string, string[]>
@@ -27,7 +34,7 @@ public static class ScoreEventEndpoints
             });
         }
 
-        var game = await db.Games.FirstOrDefaultAsync(g => g.Id == gameId);
+        var game = await EndpointOwnership.FindOwnedGameAsync(db, gameId, userId.Value);
         if (game is null)
         {
             return Results.NotFound();

@@ -1,5 +1,10 @@
 namespace Jeopareddy.Api.Contracts;
 
+public sealed record RegisterRequest(string Email, string DisplayName, string Password);
+public sealed record LoginRequest(string Email, string Password);
+public sealed record AuthResponse(string AccessToken, UserProfileResponse User);
+public sealed record UserProfileResponse(Guid Id, string Email, string DisplayName, DateTime CreatedAtUtc);
+
 public sealed record CreateGameRequest(string Title);
 public sealed record CreateCategoryRequest(string Name, int DisplayOrder, IReadOnlyList<CreateClueRequest> Clues);
 public sealed record CreateClueRequest(

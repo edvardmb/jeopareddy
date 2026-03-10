@@ -10,12 +10,14 @@ public static class TeamEndpoints
     public static IEndpointRouteBuilder MapTeamEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapPost("/api/games/{gameId:guid}/teams", CreateTeamAsync)
+            .RequireAuthorization()
             .Produces<TeamCreatedResponse>(StatusCodes.Status201Created)
             .ProducesValidationProblem(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound)
             .Produces(StatusCodes.Status409Conflict);
 
         app.MapDelete("/api/games/{gameId:guid}/teams/{teamId:guid}", DeleteTeamAsync)
+            .RequireAuthorization()
             .Produces(StatusCodes.Status204NoContent)
             .Produces(StatusCodes.Status404NotFound)
             .Produces(StatusCodes.Status409Conflict);
@@ -23,8 +25,14 @@ public static class TeamEndpoints
         return app;
     }
 
-    private static async Task<IResult> CreateTeamAsync(Guid gameId, CreateTeamRequest request, JeopareddyDbContext db)
+    private static async Task<IResult> CreateTeamAsync(Guid gameId, CreateTeamRequest request, HttpContext httpContext, JeopareddyDbContext db)
     {
+        var userId = EndpointOwnership.TryGetUserId(httpContext);
+        if (userId is null)
+        {
+            return Results.Unauthorized();
+        }
+
         if (string.IsNullOrWhiteSpace(request.Name))
         {
             return Results.ValidationProblem(new Dictionary<string, string[]>
@@ -41,7 +49,7 @@ public static class TeamEndpoints
             });
         }
 
-        var game = await db.Games.FirstOrDefaultAsync(g => g.Id == gameId);
+        var game = await EndpointOwnership.FindOwnedGameAsync(db, gameId, userId.Value);
         if (game is null)
         {
             return Results.NotFound();
@@ -87,9 +95,15 @@ public static class TeamEndpoints
             DisplayOrder: team.DisplayOrder));
     }
 
-    private static async Task<IResult> DeleteTeamAsync(Guid gameId, Guid teamId, JeopareddyDbContext db)
+    private static async Task<IResult> DeleteTeamAsync(Guid gameId, Guid teamId, HttpContext httpContext, JeopareddyDbContext db)
     {
-        var game = await db.Games.FirstOrDefaultAsync(g => g.Id == gameId);
+        var userId = EndpointOwnership.TryGetUserId(httpContext);
+        if (userId is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        var game = await EndpointOwnership.FindOwnedGameAsync(db, gameId, userId.Value);
         if (game is null)
         {
             return Results.NotFound();

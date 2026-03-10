@@ -5,6 +5,7 @@ namespace Jeopareddy.Api.Data;
 
 public sealed class JeopareddyDbContext(DbContextOptions<JeopareddyDbContext> options) : DbContext(options)
 {
+    public DbSet<User> Users => Set<User>();
     public DbSet<Game> Games => Set<Game>();
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<Clue> Clues => Set<Clue>();
@@ -13,13 +14,30 @@ public sealed class JeopareddyDbContext(DbContextOptions<JeopareddyDbContext> op
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<User>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Email).IsRequired();
+            entity.Property(x => x.DisplayName).IsRequired();
+            entity.Property(x => x.PasswordHash).IsRequired();
+            entity.Property(x => x.CreatedAtUtc).IsRequired();
+            entity.HasIndex(x => x.Email).IsUnique();
+        });
+
         modelBuilder.Entity<Game>(entity =>
         {
             entity.HasKey(x => x.Id);
+            entity.Property(x => x.OwnerUserId);
             entity.Property(x => x.Title).IsRequired();
             entity.Property(x => x.Status).HasConversion<string>().IsRequired();
             entity.Property(x => x.CreatedAtUtc).IsRequired();
             entity.Property(x => x.UpdatedAtUtc).IsRequired();
+            entity.HasIndex(x => x.OwnerUserId);
+
+            entity.HasOne(x => x.OwnerUser)
+                .WithMany(x => x.Games)
+                .HasForeignKey(x => x.OwnerUserId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<Category>(entity =>

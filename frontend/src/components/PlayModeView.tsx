@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { Clue, Game } from "../api";
+import { Box, Button, Heading, Input, Text } from "@chakra-ui/react";
 import jokerHatUrl from "../assets/joker-hat.svg";
 import genderRevealSongUrl from "../assets/reveal.mp3";
 import MiniGameModal from "./MiniGameModal";
@@ -370,42 +371,46 @@ export default function PlayModeView(props: PlayModeViewProps) {
 
   if (game.categories.length === 0) {
     return (
-      <section className="card card-play">
-        <h2>{t("components.playModeView.title")}</h2>
-        <p className="muted">{t("components.playModeView.emptyState")}</p>
-      </section>
+      <Box as="section" className="card card-play">
+        <Heading as="h2" size="md">
+          {t("components.playModeView.title")}
+        </Heading>
+        <Text className="muted">{t("components.playModeView.emptyState")}</Text>
+      </Box>
     );
   }
 
   return (
-    <section className="card card-play">
-      <h2>{t("components.playModeView.title")}</h2>
-      <p className="muted">{t("components.playModeView.subtitle")}</p>
+    <Box as="section" className="card card-play">
+      <Heading as="h2" size="md">
+        {t("components.playModeView.title")}
+      </Heading>
+      <Text className="muted">{t("components.playModeView.subtitle")}</Text>
       {currentTeam && (
-        <p className="turn-indicator">
+        <Text className="turn-indicator">
           {t("components.playModeView.turnIndicator")}:{" "}
-          <strong>{currentTeam.name}</strong>
-        </p>
+          <Box as="strong">{currentTeam.name}</Box>
+        </Text>
       )}
 
-      <div className="play-grid">
-        <div className="play-row headers">
+      <Box className="play-grid">
+        <Box className="play-row headers">
           {sortedCategories.map((category, colIndex) => (
-            <div
+            <Box
               key={category.id}
               className={`play-cell header col-color-${colIndex % 6}`}
             >
               {category.name}
-            </div>
+            </Box>
           ))}
-        </div>
+        </Box>
         {rowValues.map((value) => (
-          <div key={value} className="play-row">
+          <Box key={value} className="play-row">
             {sortedCategories.map((category, colIndex) => {
               const clue = category.clues.find((x) => x.pointValue === value);
               const isUsed = !clue || clue.isAnswered;
               return (
-                <button
+                <Button
                   key={`${category.id}-${value}`}
                   className={`play-cell card-cell col-color-${colIndex % 6} ${isUsed ? "used" : ""}`}
                   disabled={isUsed || isBusy}
@@ -444,12 +449,12 @@ export default function PlayModeView(props: PlayModeViewProps) {
                   }}
                 >
                   {clue ? clue.pointValue : "-"}
-                </button>
+                </Button>
               );
             })}
-          </div>
+          </Box>
         ))}
-      </div>
+      </Box>
 
       {activeClue && genderRevealRound && (
         <MiniGameModal
@@ -769,7 +774,7 @@ export default function PlayModeView(props: PlayModeViewProps) {
                 <label htmlFor="play-answer">
                   {t("components.playModeView.answerLabel")}
                 </label>
-                <input
+                <Input
                   id="play-answer"
                   value={answerInput}
                   onChange={(event) => setAnswerInput(event.target.value)}
@@ -784,7 +789,7 @@ export default function PlayModeView(props: PlayModeViewProps) {
               </div>
 
               <div className="row play-answer-actions">
-                <button
+                <Button
                   className="btn-success"
                   disabled={
                     isBusy ||
@@ -830,8 +835,8 @@ export default function PlayModeView(props: PlayModeViewProps) {
                   }}
                 >
                   {t("components.playModeView.submitAnswer")}
-                </button>
-                <button
+                </Button>
+                <Button
                   className="btn-secondary"
                   type="button"
                   disabled={!hasSubmitted || isBusy}
@@ -840,7 +845,7 @@ export default function PlayModeView(props: PlayModeViewProps) {
                   }}
                 >
                   {t("components.playModeView.close")}
-                </button>
+                </Button>
               </div>
 
               {feedback && (
@@ -855,25 +860,26 @@ export default function PlayModeView(props: PlayModeViewProps) {
       {scoreOrderedTeams.length > 0 && (
         <>
           <h3>{t("components.playModeView.currentScores")}</h3>
-          <ul className="list compact-list">
+          <Box as="ul" className="list compact-list">
             {scoreOrderedTeams.map((team) => (
-              <li
+              <Box
+                as="li"
                 key={team.id}
                 className={`row ${team.id === currentTeamId ? "current-turn" : ""}`}
               >
-                <strong>{team.name}</strong>
-                <span>
+                <Box as="strong">{team.name}</Box>
+                <Text as="span">
                   {team.score} {t("common.pointsShort")}
                   {team.id === currentTeamId
                     ? ` ${t("components.playModeView.turnSuffix")}`
                     : ""}
-                </span>
-              </li>
+                </Text>
+              </Box>
             ))}
-          </ul>
+          </Box>
         </>
       )}
-    </section>
+    </Box>
   );
 }
 

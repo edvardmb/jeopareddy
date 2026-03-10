@@ -1,5 +1,6 @@
 import { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { Box, Button, Heading, Text } from "@chakra-ui/react";
 
 type MiniGameModalProps = {
   title: string;
@@ -22,32 +23,34 @@ export default function MiniGameModal(props: MiniGameModalProps) {
   } = props;
 
   return (
-    <div
+    <Box
       className="minigame-modal-backdrop"
       role="dialog"
       aria-modal="true"
       aria-labelledby="minigame-modal-title"
     >
-      <div className="minigame-modal-card">
-        <div className="minigame-glow minigame-glow-a" aria-hidden="true" />
-        <div className="minigame-glow minigame-glow-b" aria-hidden="true" />
-        <div className="minigame-glow minigame-glow-c" aria-hidden="true" />
+      <Box className="minigame-modal-card">
+        <Box className="minigame-glow minigame-glow-a" aria-hidden="true" />
+        <Box className="minigame-glow minigame-glow-b" aria-hidden="true" />
+        <Box className="minigame-glow minigame-glow-c" aria-hidden="true" />
 
-        <div className="minigame-modal-head">
-          <div>
-            <h3 id="minigame-modal-title">{title}</h3>
-            {subtitle && <p className="tiny muted">{subtitle}</p>}
-          </div>
-          <div className="minigame-head-actions">
+        <Box className="minigame-modal-head">
+          <Box>
+            <Heading as="h3" size="md" id="minigame-modal-title">
+              {title}
+            </Heading>
+            {subtitle && <Text className="tiny muted">{subtitle}</Text>}
+          </Box>
+          <Box className="minigame-head-actions">
             {headerVisual}
-            <button className="btn-secondary" type="button" onClick={onClose}>
+            <Button className="btn-secondary" type="button" onClick={onClose}>
               {closeLabel}
-            </button>
-          </div>
-        </div>
+            </Button>
+          </Box>
+        </Box>
 
         {children}
-      </div>
-    </div>
+      </Box>
+    </Box>
   );
 }

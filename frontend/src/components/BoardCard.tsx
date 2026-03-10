@@ -1,5 +1,6 @@
 import { Category } from "../api";
 import { useTranslation } from "react-i18next";
+import { Box, Button, Heading, Text } from "@chakra-ui/react";
 
 type BoardCardProps = {
   categories: Category[];
@@ -41,32 +42,34 @@ export default function BoardCard(props: BoardCardProps) {
   } = props;
 
   return (
-    <section className="card card-board">
-      <h2>{t("components.boardCard.title")}</h2>
-      <p className="muted">{t("components.boardCard.subtitle")}</p>
+    <Box as="section" className="card card-board">
+      <Heading as="h2" size="md">
+        {t("components.boardCard.title")}
+      </Heading>
+      <Text className="muted">{t("components.boardCard.subtitle")}</Text>
       {!isDraft && (
-        <p className="tiny section-lock-note">
+        <Text className="tiny section-lock-note">
           {t("components.boardCard.draftOnlyNote")}
-        </p>
+        </Text>
       )}
       {categories.length === 0 ? (
-        <p className="muted">{t("components.boardCard.noCategories")}</p>
+        <Text className="muted">{t("components.boardCard.noCategories")}</Text>
       ) : (
         categories.map((category) => (
-          <details key={category.id} className="category accordion-category">
-            <summary className="category-summary">
-              <span className="category-summary-title">
+          <Box as="details" key={category.id} className="category accordion-category">
+            <Box as="summary" className="category-summary">
+              <Text as="span" className="category-summary-title">
                 {category.displayOrder}. {category.name}
-              </span>
-              <span className="tiny muted">
+              </Text>
+              <Text as="span" className="tiny muted">
                 {t("components.boardCard.questionsCount", {
                   count: category.clues.length,
                 })}
-              </span>
-            </summary>
+              </Text>
+            </Box>
             {isDraft && (
-              <div className="row" style={{ marginTop: "0.6rem" }}>
-                <button
+              <Box className="row" style={{ marginTop: "0.6rem" }}>
+                <Button
                   className="btn-secondary"
                   disabled={isBusy}
                   type="button"
@@ -102,8 +105,8 @@ export default function BoardCard(props: BoardCardProps) {
                   }}
                 >
                   {t("components.boardCard.editCategory")}
-                </button>
-                <button
+                </Button>
+                <Button
                   className="btn-danger"
                   disabled={isBusy}
                   type="button"
@@ -121,36 +124,38 @@ export default function BoardCard(props: BoardCardProps) {
                   }}
                 >
                   {t("components.boardCard.removeCategory")}
-                </button>
-              </div>
+                </Button>
+              </Box>
             )}
-            <ul className="list">
+            <Box as="ul" className="list">
               {category.clues.map((clue) => (
-                <li key={clue.id} className="clue-admin-item">
-                  <div className="clue-admin-text">
-                    <strong>{clue.pointValue}</strong> - {clue.prompt}
+                <Box as="li" key={clue.id} className="clue-admin-item">
+                  <Text className="clue-admin-text">
+                    <Box as="strong">{clue.pointValue}</Box> - {clue.prompt}
                     {clue.imageBase64
                       ? ` ${t("components.boardCard.imageTag")}`
                       : ""}
-                  </div>
-                  <div className="row clue-admin-controls">
-                    <span className="clue-admin-status">
-                      <span
+                  </Text>
+                  <Box className="row clue-admin-controls">
+                    <Box as="span" className="clue-admin-status">
+                      <Text
+                        as="span"
                         className={`state-pill ${clue.isRevealed ? "is-on" : ""}`}
                       >
                         {t("components.boardCard.revealedLabel")}:{" "}
                         {clue.isRevealed ? t("common.yes") : t("common.no")}
-                      </span>
-                      <span
+                      </Text>
+                      <Text
+                        as="span"
                         className={`state-pill ${clue.isAnswered ? "is-on" : ""}`}
                       >
                         {t("components.boardCard.answeredLabel")}:{" "}
                         {clue.isAnswered ? t("common.yes") : t("common.no")}
-                      </span>
-                    </span>
+                      </Text>
+                    </Box>
                     {isDraft && (
                       <>
-                        <button
+                        <Button
                           className="btn-secondary"
                           disabled={isBusy}
                           type="button"
@@ -169,8 +174,8 @@ export default function BoardCard(props: BoardCardProps) {
                           }}
                         >
                           {t("components.boardCard.editQuestion")}
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           className="btn-danger"
                           disabled={isBusy}
                           type="button"
@@ -188,30 +193,30 @@ export default function BoardCard(props: BoardCardProps) {
                           }}
                         >
                           {t("components.boardCard.removeQuestion")}
-                        </button>
+                        </Button>
                       </>
                     )}
-                    <button
+                    <Button
                       className="btn-secondary"
                       disabled={isBusy}
                       onClick={() => onToggleReveal(clue.id, clue.isRevealed)}
                     >
                       {t("components.boardCard.revealHide")}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       className="btn-secondary"
                       disabled={isBusy}
                       onClick={() => onToggleAnswered(clue.id, clue.isAnswered)}
                     >
                       {t("components.boardCard.markAnswered")}
-                    </button>
-                  </div>
-                </li>
+                    </Button>
+                  </Box>
+                </Box>
               ))}
-            </ul>
-          </details>
+            </Box>
+          </Box>
         ))
       )}
-    </section>
+    </Box>
   );
 }

@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import { Box, Button, Heading, Input, Text } from "@chakra-ui/react";
 
 type CreateGameCardProps = {
   gameTitle: string;
@@ -12,25 +13,27 @@ export default function CreateGameCard(props: CreateGameCardProps) {
   const { gameTitle, isBusy, onGameTitleChange, onCreate } = props;
 
   return (
-    <section className="card card-blue">
-      <h2>{t("components.createGameCard.title")}</h2>
-      <p className="muted">{t("components.createGameCard.subtitle")}</p>
-      <div className="row">
-        <div className="field">
+    <Box as="section" className="card card-blue">
+      <Heading as="h2" size="md">
+        {t("components.createGameCard.title")}
+      </Heading>
+      <Text className="muted">{t("components.createGameCard.subtitle")}</Text>
+      <Box className="row">
+        <Box className="field">
           <label htmlFor="create-game-title">
             {t("components.createGameCard.gameTitleLabel")}
           </label>
-          <input
+          <Input
             id="create-game-title"
             value={gameTitle}
             onChange={(event) => onGameTitleChange(event.target.value)}
             placeholder={t("components.createGameCard.gameTitlePlaceholder")}
           />
-        </div>
-        <button className="btn-primary" disabled={isBusy} onClick={onCreate}>
+        </Box>
+        <Button className="btn-primary" disabled={isBusy} onClick={onCreate}>
           {t("components.createGameCard.createButton")}
-        </button>
-      </div>
-    </section>
+        </Button>
+      </Box>
+    </Box>
   );
 }

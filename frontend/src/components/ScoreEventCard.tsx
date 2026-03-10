@@ -1,6 +1,7 @@
 import { Team } from "../api";
 import { useTranslation } from "react-i18next";
 import InfoHint from "./InfoHint";
+import { Box, Button, Heading, Input, Text } from "@chakra-ui/react";
 
 type ScoreEventCardProps = {
   teams: Team[];
@@ -31,11 +32,13 @@ export default function ScoreEventCard(props: ScoreEventCardProps) {
   } = props;
 
   return (
-    <section className="card card-orange">
-      <h2>{t("components.scoreEventCard.title")}</h2>
-      <p className="muted">{t("components.scoreEventCard.subtitle")}</p>
-      <div className="grid">
-        <div className="field">
+    <Box as="section" className="card card-orange">
+      <Heading as="h2" size="md">
+        {t("components.scoreEventCard.title")}
+      </Heading>
+      <Text className="muted">{t("components.scoreEventCard.subtitle")}</Text>
+      <Box className="grid">
+        <Box className="field">
           <label htmlFor="score-team">
             {t("components.scoreEventCard.teamLabel")}
           </label>
@@ -53,9 +56,9 @@ export default function ScoreEventCard(props: ScoreEventCardProps) {
               </option>
             ))}
           </select>
-        </div>
-        <div className="field">
-          <div className="field-label-row">
+        </Box>
+        <Box className="field">
+          <Box className="field-label-row">
             <label htmlFor="score-delta">
               {t("components.scoreEventCard.pointsChangeLabel")}
             </label>
@@ -63,34 +66,34 @@ export default function ScoreEventCard(props: ScoreEventCardProps) {
               text={t("components.scoreEventCard.pointsChangeHelp")}
               label={t("components.scoreEventCard.pointsChangeHelpLabel")}
             />
-          </div>
-          <input
+          </Box>
+          <Input
             id="score-delta"
             value={scoreDelta}
             type="number"
             onChange={(event) => onScoreDeltaChange(Number(event.target.value))}
             placeholder={t("components.scoreEventCard.pointsChangePlaceholder")}
           />
-        </div>
-        <div className="field">
+        </Box>
+        <Box className="field">
           <label htmlFor="score-reason">
             {t("components.scoreEventCard.reasonLabel")}
           </label>
-          <input
+          <Input
             id="score-reason"
             value={scoreReason}
             onChange={(event) => onScoreReasonChange(event.target.value)}
             placeholder={t("components.scoreEventCard.reasonPlaceholder")}
           />
-        </div>
-        <button
+        </Box>
+        <Button
           className="btn-warning"
           disabled={isBusy || !canOperateOnGame || !scoreTeamId}
           onClick={onApplyScore}
         >
           {t("components.scoreEventCard.applyPoints")}
-        </button>
-      </div>
-    </section>
+        </Button>
+      </Box>
+    </Box>
   );
 }

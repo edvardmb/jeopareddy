@@ -1,3 +1,5 @@
+import { getAccessToken } from "../authToken";
+
 type FetcherOptions<TBody> = {
   url: string;
   method: string;
@@ -66,10 +68,12 @@ function withQueryParams(
 export async function orvalFetcher<TResponse, TBody = unknown>(
   options: FetcherOptions<TBody>,
 ): Promise<TResponse> {
+  const accessToken = getAccessToken();
   const response = await fetch(`${API_BASE_URL}${withQueryParams(options.url, options.params)}`, {
     method: options.method,
     headers: {
       "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       ...options.headers,
     },
     body: options.data === undefined ? undefined : JSON.stringify(options.data),

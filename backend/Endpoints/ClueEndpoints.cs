@@ -10,17 +10,20 @@ public static class ClueEndpoints
     public static IEndpointRouteBuilder MapClueEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapPatch("/api/games/{gameId:guid}/clues/{clueId:guid}", UpdateClueAsync)
+            .RequireAuthorization()
             .Produces<ClueResponse>(StatusCodes.Status200OK)
             .ProducesValidationProblem(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
 
         app.MapPatch("/api/games/{gameId:guid}/clues/{clueId:guid}/content", UpdateClueContentAsync)
+            .RequireAuthorization()
             .Produces(StatusCodes.Status204NoContent)
             .ProducesValidationProblem(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound)
             .Produces(StatusCodes.Status409Conflict);
 
         app.MapDelete("/api/games/{gameId:guid}/clues/{clueId:guid}", DeleteClueAsync)
+            .RequireAuthorization()
             .Produces(StatusCodes.Status204NoContent)
             .Produces(StatusCodes.Status404NotFound)
             .Produces(StatusCodes.Status409Conflict);
@@ -28,8 +31,14 @@ public static class ClueEndpoints
         return app;
     }
 
-    private static async Task<IResult> UpdateClueAsync(Guid gameId, Guid clueId, UpdateClueRequest request, JeopareddyDbContext db)
+    private static async Task<IResult> UpdateClueAsync(Guid gameId, Guid clueId, UpdateClueRequest request, HttpContext httpContext, JeopareddyDbContext db)
     {
+        var userId = EndpointOwnership.TryGetUserId(httpContext);
+        if (userId is null)
+        {
+            return Results.Unauthorized();
+        }
+
         if (request.IsRevealed is null && request.IsAnswered is null)
         {
             return Results.ValidationProblem(new Dictionary<string, string[]>
@@ -38,7 +47,7 @@ public static class ClueEndpoints
             });
         }
 
-        var game = await db.Games.FirstOrDefaultAsync(g => g.Id == gameId);
+        var game = await EndpointOwnership.FindOwnedGameAsync(db, gameId, userId.Value);
         if (game is null)
         {
             return Results.NotFound();
@@ -75,8 +84,14 @@ public static class ClueEndpoints
             IsAnswered: clue.IsAnswered));
     }
 
-    private static async Task<IResult> UpdateClueContentAsync(Guid gameId, Guid clueId, UpdateClueContentRequest request, JeopareddyDbContext db)
+    private static async Task<IResult> UpdateClueContentAsync(Guid gameId, Guid clueId, UpdateClueContentRequest request, HttpContext httpContext, JeopareddyDbContext db)
     {
+        var userId = EndpointOwnership.TryGetUserId(httpContext);
+        if (userId is null)
+        {
+            return Results.Unauthorized();
+        }
+
         if (string.IsNullOrWhiteSpace(request.Prompt))
         {
             return Results.ValidationProblem(new Dictionary<string, string[]>
@@ -115,7 +130,7 @@ public static class ClueEndpoints
             return imageValidation;
         }
 
-        var game = await db.Games.FirstOrDefaultAsync(g => g.Id == gameId);
+        var game = await EndpointOwnership.FindOwnedGameAsync(db, gameId, userId.Value);
         if (game is null)
         {
             return Results.NotFound();
@@ -152,9 +167,15 @@ public static class ClueEndpoints
         return Results.NoContent();
     }
 
-    private static async Task<IResult> DeleteClueAsync(Guid gameId, Guid clueId, JeopareddyDbContext db)
+    private static async Task<IResult> DeleteClueAsync(Guid gameId, Guid clueId, HttpContext httpContext, JeopareddyDbContext db)
     {
-        var game = await db.Games.FirstOrDefaultAsync(g => g.Id == gameId);
+        var userId = EndpointOwnership.TryGetUserId(httpContext);
+        if (userId is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        var game = await EndpointOwnership.FindOwnedGameAsync(db, gameId, userId.Value);
         if (game is null)
         {
             return Results.NotFound();

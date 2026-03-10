@@ -6,6 +6,10 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - ConnectionStrings__DefaultConnection=Data Source=/data/jeopareddy.db
+      - Jwt__Issuer=Jeopareddy.Api
+      - Jwt__Audience=Jeopareddy.Frontend
+      - Jwt__Key=change-this-production-key-to-a-long-random-secret
+      - Jwt__AccessTokenMinutes=720
     volumes:
       - jeopareddy_data:/data
     restart: unless-stopped

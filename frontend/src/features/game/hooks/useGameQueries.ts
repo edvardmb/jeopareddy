@@ -13,17 +13,18 @@ export async function fetchGameById(gameId: string) {
   return mapGameResponse(game);
 }
 
-export function useGamesQuery() {
+export function useGamesQuery(enabled = true) {
   return useQuery({
     queryKey: gameQueryKeys.list(),
     queryFn: fetchGamesList,
+    enabled,
   });
 }
 
-export function useGameQuery(gameId: string) {
+export function useGameQuery(gameId: string, enabled = true) {
   return useQuery({
     queryKey: gameQueryKeys.detail(gameId),
     queryFn: () => fetchGameById(gameId),
-    enabled: Boolean(gameId),
+    enabled: enabled && Boolean(gameId),
   });
 }

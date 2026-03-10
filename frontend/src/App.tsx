@@ -1,7 +1,13 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQueryClient } from "@tanstack/react-query";
-import { API_BASE_URL } from "./api";
+import {
+  API_BASE_URL,
+  getCurrentUser,
+  loginUser,
+  registerUser,
+  type UserProfile,
+} from "./api";
 import { Box, Button, Heading, Input, Text } from "@chakra-ui/react";
 import AddCategoryCard, {
   createQuestionDraftFromStoredClue,
@@ -28,12 +34,23 @@ import {
   useGamesQuery,
 } from "./features/game/hooks/useGameQueries";
 import { useMiniGameAssignments } from "./features/miniGames/hooks/useMiniGameAssignments";
+import {
+  clearAccessToken,
+  hasAccessToken,
+  setAccessToken,
+} from "./authToken";
 
 const PlayModeView = lazy(() => import("./components/PlayModeView"));
 
 function App() {
   const queryClient = useQueryClient();
   const { t, i18n } = useTranslation();
+  const [authUser, setAuthUser] = useState<UserProfile | null>(null);
+  const [authMode, setAuthMode] = useState<"login" | "register">("login");
+  const [email, setEmail] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [password, setPassword] = useState("");
+  const [isAuthLoading, setIsAuthLoading] = useState(hasAccessToken());
   const [gameTitle, setGameTitle] = useState("Friday Trivia Night");
   const [gameIdInput, setGameIdInput] = useState("");
   const [selectedGameId, setSelectedGameId] = useState("");
@@ -55,8 +72,9 @@ function App() {
     question: QuestionDraft;
   } | null>(null);
 
-  const gamesQuery = useGamesQuery();
-  const loadedGameQuery = useGameQuery(selectedGameId);
+  const isAuthenticated = Boolean(authUser);
+  const gamesQuery = useGamesQuery(isAuthenticated);
+  const loadedGameQuery = useGameQuery(selectedGameId, isAuthenticated);
   const loadedGame = loadedGameQuery.data ?? null;
   const games = gamesQuery.data ?? [];
   const mutations = useGameMutations();
@@ -79,6 +97,17 @@ function App() {
   const changeLanguage = (language: SupportedLanguage) => {
     void i18n.changeLanguage(language);
     globalThis.localStorage?.setItem("jeopareddy.language", language);
+  };
+
+  const logout = () => {
+    clearAccessToken();
+    setAuthUser(null);
+    setSelectedGameId("");
+    setGameIdInput("");
+    setActiveSection("dashboard");
+    setMessage("Logged out.");
+    setMessageTone("success");
+    void queryClient.clear();
   };
 
   const loadGame = async (gameId: string) => {
@@ -116,6 +145,28 @@ function App() {
       setIsActionBusy(false);
     }
   };
+
+  useEffect(() => {
+    const initializeAuth = async () => {
+      const token = globalThis.localStorage?.getItem("jeopareddy.accessToken");
+      if (!token) {
+        setIsAuthLoading(false);
+        return;
+      }
+
+      try {
+        const user = await getCurrentUser(token);
+        setAuthUser(user);
+      } catch {
+        clearAccessToken();
+        setAuthUser(null);
+      } finally {
+        setIsAuthLoading(false);
+      }
+    };
+
+    void initializeAuth();
+  }, []);
 
   useEffect(() => {
     if (!gamesQuery.isError) {
@@ -177,6 +228,94 @@ function App() {
     }
   }, [currentTurnTeamId, loadedGame]);
 
+  if (isAuthLoading) {
+    return (
+      <Box as="main" className="page">
+        <Box as="section" className="card">
+          <Heading as="h2" size="md">
+            Loading profile...
+          </Heading>
+        </Box>
+      </Box>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <Box as="main" className="page">
+        <Box as="section" className="card">
+          <Heading as="h2" size="md">
+            {authMode === "login" ? "Sign in" : "Create profile"}
+          </Heading>
+          <Text className="muted">
+            {authMode === "login"
+              ? "Sign in to access your quizzes."
+              : "Create a profile to own your quizzes."}
+          </Text>
+          <Box className="field">
+            <label htmlFor="auth-email">Email</label>
+            <Input
+              id="auth-email"
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+            />
+          </Box>
+          {authMode === "register" && (
+            <Box className="field">
+              <label htmlFor="auth-display-name">Display name</label>
+              <Input
+                id="auth-display-name"
+                value={displayName}
+                onChange={(event) => setDisplayName(event.target.value)}
+              />
+            </Box>
+          )}
+          <Box className="field">
+            <label htmlFor="auth-password">Password</label>
+            <Input
+              id="auth-password"
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+          </Box>
+          {message && <Text className={`message ${messageTone}`}>{message}</Text>}
+          <Box display="flex" gap="0.75rem">
+            <Button
+              onClick={() =>
+                withBusy(async () => {
+                  const authResult =
+                    authMode === "login"
+                      ? await loginUser({ email, password })
+                      : await registerUser({ email, displayName, password });
+                  setAccessToken(authResult.accessToken);
+                  setAuthUser(authResult.user);
+                  setMessage(
+                    authMode === "login"
+                      ? "Signed in successfully."
+                      : "Profile created successfully.",
+                  );
+                  setMessageTone("success");
+                })
+              }
+            >
+              {authMode === "login" ? "Sign in" : "Create profile"}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() =>
+                setAuthMode((mode) => (mode === "login" ? "register" : "login"))
+              }
+            >
+              {authMode === "login" ? "Need an account?" : "Have an account?"}
+            </Button>
+          </Box>
+        </Box>
+      </Box>
+    );
+  }
+
   return (
     <Box as="main" className="page">
       <Box as="header" className="app-header">
@@ -200,6 +339,12 @@ function App() {
             value={selectedLanguage}
             onChange={changeLanguage}
           />
+          <Text className="tiny muted">
+            {authUser?.displayName} ({authUser?.email})
+          </Text>
+          <Button size="sm" variant="outline" onClick={logout}>
+            Sign out
+          </Button>
           <Text className="tiny muted">API: {API_BASE_URL}</Text>
         </Box>
       </Box>

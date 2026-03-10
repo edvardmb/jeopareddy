@@ -18,48 +18,63 @@ public static class GameEndpoints
     public static IEndpointRouteBuilder MapGameEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapGet("/api/games", ListGamesAsync)
+            .RequireAuthorization()
             .Produces<IReadOnlyList<GameListItemResponse>>(StatusCodes.Status200OK);
 
         app.MapPost("/api/games", CreateGameAsync)
+            .RequireAuthorization()
             .Produces<GameResponse>(StatusCodes.Status201Created)
             .ProducesValidationProblem(StatusCodes.Status400BadRequest);
 
         app.MapGet("/api/games/{gameId:guid}", GetGameAsync)
+            .RequireAuthorization()
             .Produces<GameResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status404NotFound);
 
         app.MapPost("/api/games/{gameId:guid}/categories", CreateCategoryAsync)
+            .RequireAuthorization()
             .Produces<CategoryCreatedResponse>(StatusCodes.Status201Created)
             .ProducesValidationProblem(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound)
             .Produces(StatusCodes.Status409Conflict);
 
         app.MapPatch("/api/games/{gameId:guid}/categories/{categoryId:guid}", UpdateCategoryAsync)
+            .RequireAuthorization()
             .Produces(StatusCodes.Status204NoContent)
             .ProducesValidationProblem(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound)
             .Produces(StatusCodes.Status409Conflict);
 
         app.MapDelete("/api/games/{gameId:guid}/categories/{categoryId:guid}", DeleteCategoryAsync)
+            .RequireAuthorization()
             .Produces(StatusCodes.Status204NoContent)
             .Produces(StatusCodes.Status404NotFound)
             .Produces(StatusCodes.Status409Conflict);
 
         app.MapPost("/api/games/{gameId:guid}/start", StartGameAsync)
+            .RequireAuthorization()
             .Produces<StartGameResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status404NotFound);
 
         app.MapPost("/api/games/{gameId:guid}/reset", ResetGameAsync)
+            .RequireAuthorization()
             .Produces<ResetGameResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status404NotFound);
 
         return app;
     }
 
-    private static async Task<IResult> ListGamesAsync(JeopareddyDbContext db)
+    private static async Task<IResult> ListGamesAsync(HttpContext httpContext, JeopareddyDbContext db)
     {
+        var userId = EndpointOwnership.TryGetUserId(httpContext);
+        if (userId is null)
+        {
+            return Results.Unauthorized();
+        }
+
         var games = await db.Games
             .AsNoTracking()
+            .Where(g => g.OwnerUserId == userId.Value)
             .OrderByDescending(g => g.UpdatedAtUtc)
             .Select(g => new GameListItemResponse(
                 g.Id,
@@ -72,8 +87,14 @@ public static class GameEndpoints
         return Results.Ok(games);
     }
 
-    private static async Task<IResult> CreateGameAsync(CreateGameRequest request, JeopareddyDbContext db)
+    private static async Task<IResult> CreateGameAsync(CreateGameRequest request, HttpContext httpContext, JeopareddyDbContext db)
     {
+        var userId = EndpointOwnership.TryGetUserId(httpContext);
+        if (userId is null)
+        {
+            return Results.Unauthorized();
+        }
+
         if (string.IsNullOrWhiteSpace(request.Title))
         {
             return Results.ValidationProblem(new Dictionary<string, string[]>
@@ -86,6 +107,7 @@ public static class GameEndpoints
         var game = new Game
         {
             Id = Guid.NewGuid(),
+            OwnerUserId = userId.Value,
             Title = request.Title.Trim(),
             Status = GameStatus.Draft,
             CreatedAtUtc = now,
@@ -105,9 +127,16 @@ public static class GameEndpoints
             Teams: []));
     }
 
-    private static async Task<IResult> GetGameAsync(Guid gameId, JeopareddyDbContext db)
+    private static async Task<IResult> GetGameAsync(Guid gameId, HttpContext httpContext, JeopareddyDbContext db)
     {
-        var game = await db.Games.AsNoTracking().FirstOrDefaultAsync(g => g.Id == gameId);
+        var userId = EndpointOwnership.TryGetUserId(httpContext);
+        if (userId is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        var game = await db.Games.AsNoTracking()
+            .FirstOrDefaultAsync(g => g.Id == gameId && g.OwnerUserId == userId.Value);
         if (game is null)
         {
             return Results.NotFound();
@@ -171,8 +200,14 @@ public static class GameEndpoints
             Teams: teams));
     }
 
-    private static async Task<IResult> CreateCategoryAsync(Guid gameId, CreateCategoryRequest request, JeopareddyDbContext db)
+    private static async Task<IResult> CreateCategoryAsync(Guid gameId, CreateCategoryRequest request, HttpContext httpContext, JeopareddyDbContext db)
     {
+        var userId = EndpointOwnership.TryGetUserId(httpContext);
+        if (userId is null)
+        {
+            return Results.Unauthorized();
+        }
+
         if (string.IsNullOrWhiteSpace(request.Name))
         {
             return Results.ValidationProblem(new Dictionary<string, string[]>
@@ -203,7 +238,7 @@ public static class GameEndpoints
             return clueImageValidation;
         }
 
-        var game = await db.Games.FirstOrDefaultAsync(g => g.Id == gameId);
+        var game = await EndpointOwnership.FindOwnedGameAsync(db, gameId, userId.Value);
         if (game is null)
         {
             return Results.NotFound();
@@ -257,8 +292,14 @@ public static class GameEndpoints
             DisplayOrder: category.DisplayOrder));
     }
 
-    private static async Task<IResult> UpdateCategoryAsync(Guid gameId, Guid categoryId, UpdateCategoryRequest request, JeopareddyDbContext db)
+    private static async Task<IResult> UpdateCategoryAsync(Guid gameId, Guid categoryId, UpdateCategoryRequest request, HttpContext httpContext, JeopareddyDbContext db)
     {
+        var userId = EndpointOwnership.TryGetUserId(httpContext);
+        if (userId is null)
+        {
+            return Results.Unauthorized();
+        }
+
         if (string.IsNullOrWhiteSpace(request.Name))
         {
             return Results.ValidationProblem(new Dictionary<string, string[]>
@@ -275,7 +316,7 @@ public static class GameEndpoints
             });
         }
 
-        var game = await db.Games.FirstOrDefaultAsync(g => g.Id == gameId);
+        var game = await EndpointOwnership.FindOwnedGameAsync(db, gameId, userId.Value);
         if (game is null)
         {
             return Results.NotFound();
@@ -308,9 +349,15 @@ public static class GameEndpoints
         return Results.NoContent();
     }
 
-    private static async Task<IResult> DeleteCategoryAsync(Guid gameId, Guid categoryId, JeopareddyDbContext db)
+    private static async Task<IResult> DeleteCategoryAsync(Guid gameId, Guid categoryId, HttpContext httpContext, JeopareddyDbContext db)
     {
-        var game = await db.Games.FirstOrDefaultAsync(g => g.Id == gameId);
+        var userId = EndpointOwnership.TryGetUserId(httpContext);
+        if (userId is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        var game = await EndpointOwnership.FindOwnedGameAsync(db, gameId, userId.Value);
         if (game is null)
         {
             return Results.NotFound();
@@ -334,9 +381,15 @@ public static class GameEndpoints
         return Results.NoContent();
     }
 
-    private static async Task<IResult> StartGameAsync(Guid gameId, JeopareddyDbContext db)
+    private static async Task<IResult> StartGameAsync(Guid gameId, HttpContext httpContext, JeopareddyDbContext db)
     {
-        var game = await db.Games.FirstOrDefaultAsync(g => g.Id == gameId);
+        var userId = EndpointOwnership.TryGetUserId(httpContext);
+        if (userId is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        var game = await EndpointOwnership.FindOwnedGameAsync(db, gameId, userId.Value);
         if (game is null)
         {
             return Results.NotFound();
@@ -352,9 +405,15 @@ public static class GameEndpoints
             UpdatedAtUtc: game.UpdatedAtUtc));
     }
 
-    private static async Task<IResult> ResetGameAsync(Guid gameId, JeopareddyDbContext db)
+    private static async Task<IResult> ResetGameAsync(Guid gameId, HttpContext httpContext, JeopareddyDbContext db)
     {
-        var game = await db.Games.FirstOrDefaultAsync(g => g.Id == gameId);
+        var userId = EndpointOwnership.TryGetUserId(httpContext);
+        if (userId is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        var game = await EndpointOwnership.FindOwnedGameAsync(db, gameId, userId.Value);
         if (game is null)
         {
             return Results.NotFound();

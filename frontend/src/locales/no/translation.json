@@ -85,7 +85,13 @@
     "includeGender": "Inkluder Gender Reveal i spillet",
     "genderAppearancesHelp": "Hvor mange ledetråder som utløser gender reveal-minispillet før spørsmålet vises. Joker-tildelinger har prioritet hvis begge er aktivert.",
     "genderAppearancesHelpLabel": "Hjelp for gender reveal-forekomster",
-    "genderOutcomeNote": "Utfallet er for øyeblikket satt til gutt for denne hendelsen."
+    "genderOutcomeNote": "Utfallet er for øyeblikket satt til gutt for denne hendelsen.",
+    "rockPaperScissorsTitle": "Stein saks papir-minispill",
+    "rockPaperScissorsHelp": "En rask stein-saks-papir-duell før spørsmålet vises. Vinn for +50 poeng, tap for -50 poeng på spørsmålsverdien.",
+    "includeRockPaperScissors": "Inkluder stein saks papir i spillet",
+    "rockPaperScissorsAppearancesHelp": "Hvor mange ledetråder som utløser stein-saks-papir før spørsmålet vises. Joker- og gender reveal-tildelinger har prioritet hvis de overlapper.",
+    "rockPaperScissorsAppearancesHelpLabel": "Hjelp for stein saks papir-forekomster",
+    "rockPaperScissorsOutcomeNote": "Datamaskinen velger tilfeldig mellom de to gjenværende valgene, så uavgjort unngås."
   },
   "components": {
     "languageSelector": {
@@ -257,7 +263,22 @@
       "jokerOutcomeDown": "Feil - ned ett nivå",
       "jokerOutcomeStay": "Likhet - stå",
       "jokerWord": "Joker",
-      "thiefWord": "Tyv"
+      "thiefWord": "Tyv",
+      "rockPaperScissorsTitle": "Stein Saks Papir",
+      "rockPaperScissorsSubtitle": "Lag {{teamName}}: velg trekk",
+      "rpsChoiceAria": "Velg stein, papir eller saks",
+      "rpsRock": "Stein",
+      "rpsPaper": "Papir",
+      "rpsScissors": "Saks",
+      "rpsScissorsBang": "Saks!",
+      "rpsReady": "Stein. Saks. Papir.",
+      "rpsRevealReady": "Vis resultat",
+      "rpsYou": "Dere",
+      "rpsComputer": "Maskinen",
+      "rpsWinMessage": "Dere vinner. +{{points}} poeng lagt til dette spørsmålet.",
+      "rpsLoseMessage": "Dere taper. -{{points}} poeng trukket fra dette spørsmålet.",
+      "rpsQuestionWinResult": "Stein-saks-papir-seier: +{{points}} poeng lagt til før spørsmålet.",
+      "rpsQuestionLoseResult": "Stein-saks-papir-tap: -{{points}} poeng før spørsmålet."
     },
     "designPreview": {
       "ariaLabel": "Designforhåndsvisning",

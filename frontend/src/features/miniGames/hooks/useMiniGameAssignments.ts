@@ -18,10 +18,17 @@ export function useMiniGameAssignments(game: Game | null) {
     useState(1);
   const [genderRevealAssignedClueIds, setGenderRevealAssignedClueIds] =
     useState<string[]>([]);
+  const [rockPaperScissorsEnabled, setRockPaperScissorsEnabled] =
+    useState(false);
+  const [rockPaperScissorsAppearancesPerGame, setRockPaperScissorsAppearancesPerGame] =
+    useState(1);
+  const [rockPaperScissorsAssignedClueIds, setRockPaperScissorsAssignedClueIds] =
+    useState<string[]>([]);
 
   useEffect(() => {
     setJokerAssignedClueIds([]);
     setGenderRevealAssignedClueIds([]);
+    setRockPaperScissorsAssignedClueIds([]);
   }, [game?.id]);
 
   useEffect(() => {
@@ -85,6 +92,47 @@ export function useMiniGameAssignments(game: Game | null) {
     jokerAssignedClueIds,
   ]);
 
+  useEffect(() => {
+    if (!game || !rockPaperScissorsEnabled) {
+      if (rockPaperScissorsAssignedClueIds.length > 0) {
+        setRockPaperScissorsAssignedClueIds([]);
+      }
+      return;
+    }
+
+    const excludedClueIdSet = new Set([
+      ...jokerAssignedClueIds,
+      ...genderRevealAssignedClueIds,
+    ]);
+    const eligibleClues = game.categories
+      .flatMap((category) => category.clues)
+      .filter((clue) => !excludedClueIdSet.has(clue.id));
+    const targetCount = Math.max(
+      0,
+      Math.min(
+        Math.floor(rockPaperScissorsAppearancesPerGame || 0),
+        eligibleClues.length,
+      ),
+    );
+
+    const nextAssignments = reconcileAssignments({
+      assignedIds: rockPaperScissorsAssignedClueIds,
+      eligibleClues,
+      targetCount,
+    });
+
+    if (!sameStringSet(rockPaperScissorsAssignedClueIds, nextAssignments)) {
+      setRockPaperScissorsAssignedClueIds(nextAssignments);
+    }
+  }, [
+    game,
+    genderRevealAssignedClueIds,
+    jokerAssignedClueIds,
+    rockPaperScissorsAppearancesPerGame,
+    rockPaperScissorsAssignedClueIds,
+    rockPaperScissorsEnabled,
+  ]);
+
   const jokerStats = useMemo(
     () =>
       computeAssignmentStats({
@@ -101,10 +149,19 @@ export function useMiniGameAssignments(game: Game | null) {
       }),
     [game, genderRevealAssignedClueIds],
   );
+  const rockPaperScissorsStats = useMemo(
+    () =>
+      computeAssignmentStats({
+        assignedIds: rockPaperScissorsAssignedClueIds,
+        allClues: game?.categories.flatMap((category) => category.clues) ?? [],
+      }),
+    [game, rockPaperScissorsAssignedClueIds],
+  );
 
   const resetAssignments = () => {
     setJokerAssignedClueIds([]);
     setGenderRevealAssignedClueIds([]);
+    setRockPaperScissorsAssignedClueIds([]);
   };
 
   return {
@@ -127,6 +184,14 @@ export function useMiniGameAssignments(game: Game | null) {
       setAppearancesPerGame: setGenderRevealAppearancesPerGame,
       assignedClueIds: genderRevealAssignedClueIds,
       stats: genderRevealStats,
+    },
+    rockPaperScissors: {
+      enabled: rockPaperScissorsEnabled,
+      setEnabled: setRockPaperScissorsEnabled,
+      appearancesPerGame: rockPaperScissorsAppearancesPerGame,
+      setAppearancesPerGame: setRockPaperScissorsAppearancesPerGame,
+      assignedClueIds: rockPaperScissorsAssignedClueIds,
+      stats: rockPaperScissorsStats,
     },
     resetAssignments,
   };

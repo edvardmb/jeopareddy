@@ -610,6 +610,34 @@ function App() {
               stats={miniGames.genderReveal.stats}
               footnotes={[t("sections.genderOutcomeNote"), t("sections.localOnly")]}
             />
+
+            <MiniGameSettingsCard
+              title={t("sections.rockPaperScissorsTitle")}
+              description={t("sections.rockPaperScissorsHelp")}
+              includeToggleLabel={t("sections.includeRockPaperScissors")}
+              enabled={miniGames.rockPaperScissors.enabled}
+              onToggleEnabled={() =>
+                miniGames.rockPaperScissors.setEnabled(
+                  (value: boolean) => !value,
+                )
+              }
+              appearancesPerGame={miniGames.rockPaperScissors.appearancesPerGame}
+              onAppearancesPerGameChange={
+                miniGames.rockPaperScissors.setAppearancesPerGame
+              }
+              isBusy={isBusy}
+              isLocked={isSetupLocked}
+              canOperateOnGame={canOperateOnGame}
+              appearancesInputId="rock-paper-scissors-appearances"
+              appearancesHelpText={t(
+                "sections.rockPaperScissorsAppearancesHelp",
+              )}
+              appearancesHelpLabel={t(
+                "sections.rockPaperScissorsAppearancesHelpLabel",
+              )}
+              stats={miniGames.rockPaperScissors.stats}
+              footnotes={[t("sections.rockPaperScissorsOutcomeNote"), t("sections.localOnly")]}
+            />
           </Box>
 
           <Box>
@@ -765,6 +793,10 @@ function App() {
             genderRevealConfig={{
               enabled: miniGames.genderReveal.enabled,
               assignedClueIds: miniGames.genderReveal.assignedClueIds,
+            }}
+            rockPaperScissorsConfig={{
+              enabled: miniGames.rockPaperScissors.enabled,
+              assignedClueIds: miniGames.rockPaperScissors.assignedClueIds,
             }}
             onResolveQuestion={({
               clue,

@@ -85,7 +85,13 @@
     "includeGender": "Include Gender Reveal In Game",
     "genderAppearancesHelp": "How many clues will trigger the gender reveal minigame before the question appears. Joker assignments take priority if both are enabled.",
     "genderAppearancesHelpLabel": "Gender reveal appearances help",
-    "genderOutcomeNote": "Reveal outcome is currently set to boy for this event."
+    "genderOutcomeNote": "Reveal outcome is currently set to boy for this event.",
+    "rockPaperScissorsTitle": "Rock Paper Scissors Mini-Game",
+    "rockPaperScissorsHelp": "A fast rock-paper-scissors duel before the clue appears. Win for +50 points, lose for -50 points on the clue value.",
+    "includeRockPaperScissors": "Include Rock Paper Scissors In Game",
+    "rockPaperScissorsAppearancesHelp": "How many clues will trigger rock-paper-scissors before the question appears. Joker and gender reveal assignments take priority if they overlap.",
+    "rockPaperScissorsAppearancesHelpLabel": "Rock paper scissors appearances help",
+    "rockPaperScissorsOutcomeNote": "Computer choice is randomized from the two remaining options, so draws are avoided."
   },
   "components": {
     "languageSelector": {
@@ -257,7 +263,22 @@
       "jokerOutcomeDown": "Wrong - down one",
       "jokerOutcomeStay": "Tie - stay",
       "jokerWord": "Joker",
-      "thiefWord": "Thief"
+      "thiefWord": "Thief",
+      "rockPaperScissorsTitle": "Rock Paper Scissors",
+      "rockPaperScissorsSubtitle": "Team {{teamName}}: pick your throw",
+      "rpsChoiceAria": "Choose rock, paper, or scissors",
+      "rpsRock": "Rock",
+      "rpsPaper": "Paper",
+      "rpsScissors": "Scissors",
+      "rpsScissorsBang": "Scissors!",
+      "rpsReady": "Rock. Paper. Scissors.",
+      "rpsRevealReady": "Showdown",
+      "rpsYou": "You",
+      "rpsComputer": "Computer",
+      "rpsWinMessage": "You win. +{{points}} points added to this clue.",
+      "rpsLoseMessage": "You lose. -{{points}} points taken from this clue.",
+      "rpsQuestionWinResult": "Rock-paper-scissors win: +{{points}} points added before the question.",
+      "rpsQuestionLoseResult": "Rock-paper-scissors loss: -{{points}} points before the question."
     },
     "designPreview": {
       "ariaLabel": "Design preview",

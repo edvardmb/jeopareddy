@@ -22,6 +22,10 @@ type PlayModeViewProps = {
     enabled: boolean;
     assignedClueIds: string[];
   };
+  rockPaperScissorsConfig: {
+    enabled: boolean;
+    assignedClueIds: string[];
+  };
   onResolveQuestion: (params: {
     clue: Clue;
     teamId: string;
@@ -37,6 +41,7 @@ type JokerSpot =
   | { kind: "thief" };
 type JokerOutcome = "climb" | "down" | "stay" | "joker" | "thief";
 type GenderGuess = "boy" | "girl";
+type RockPaperScissorsChoice = "rock" | "paper" | "scissors";
 
 type JokerStep = {
   baseDigit: number;
@@ -67,6 +72,15 @@ type GenderRevealRoundState = {
   bonusMessage: string;
 };
 
+type RockPaperScissorsRoundState = {
+  status: "choosing" | "animating" | "revealed";
+  playerChoice: RockPaperScissorsChoice | null;
+  computerChoice: RockPaperScissorsChoice | null;
+  result: "win" | "lose" | null;
+  pointsDelta: number;
+  chantStep: number;
+};
+
 const JOKER_STEP_COUNT = 5;
 const JOKER_LADDER_STEP_POINTS = 25;
 const JOKER_THIEF_POINTS = 10;
@@ -77,6 +91,9 @@ const GENDER_REVEAL_BONUS_POINTS = 50;
 const GENDER_REVEAL_AUDIO_START_SECONDS = 45;
 const GENDER_REVEAL_REVEAL_DELAY_MS = 10500;
 const GENDER_REVEAL_AUDIO_FADE_MS = 3000;
+const ROCK_PAPER_SCISSORS_BONUS_POINTS = 50;
+const ROCK_PAPER_SCISSORS_CHANT_STEPS = 3;
+const ROCK_PAPER_SCISSORS_CHANT_STEP_MS = 420;
 
 export default function PlayModeView(props: PlayModeViewProps) {
   const { t } = useTranslation();
@@ -87,6 +104,7 @@ export default function PlayModeView(props: PlayModeViewProps) {
     onCurrentTeamIdChange,
     jokerConfig,
     genderRevealConfig,
+    rockPaperScissorsConfig,
     onResolveQuestion,
   } = props;
   const [activeClue, setActiveClue] = useState<Clue | null>(null);
@@ -101,6 +119,10 @@ export default function PlayModeView(props: PlayModeViewProps) {
     useState<GenderRevealRoundState | null>(null);
   const [genderRevealBonusPointsForClue, setGenderRevealBonusPointsForClue] =
     useState(0);
+  const [rockPaperScissorsRound, setRockPaperScissorsRound] =
+    useState<RockPaperScissorsRoundState | null>(null);
+  const [rockPaperScissorsPointsDeltaForClue, setRockPaperScissorsPointsDeltaForClue] =
+    useState(0);
   const [isJokerResultHolding, setIsJokerResultHolding] = useState(false);
   const [isQuestionRevealTransitioning, setIsQuestionRevealTransitioning] =
     useState(false);
@@ -108,6 +130,8 @@ export default function PlayModeView(props: PlayModeViewProps) {
   const genderRevealRevealTimeoutRef = useRef<number | null>(null);
   const genderRevealFadeIntervalRef = useRef<number | null>(null);
   const genderRevealSequenceIdRef = useRef(0);
+  const rockPaperScissorsTimeoutRef = useRef<number | null>(null);
+  const rockPaperScissorsSequenceIdRef = useRef(0);
 
   const turnOrderTeams = useMemo(
     () => [...game.teams].sort((a, b) => a.displayOrder - b.displayOrder),
@@ -186,8 +210,13 @@ export default function PlayModeView(props: PlayModeViewProps) {
     () => new Set(genderRevealConfig.assignedClueIds),
     [genderRevealConfig.assignedClueIds],
   );
+  const rockPaperScissorsAssignedIdSet = useMemo(
+    () => new Set(rockPaperScissorsConfig.assignedClueIds),
+    [rockPaperScissorsConfig.assignedClueIds],
+  );
   const jokerIsActive = jokerRound?.status === "playing";
   const genderRevealIsActive = genderRevealRound !== null;
+  const rockPaperScissorsIsActive = rockPaperScissorsRound !== null;
   const confettiPieces = useMemo(
     () =>
       Array.from({ length: 22 }, (_, index) => ({
@@ -231,13 +260,24 @@ export default function PlayModeView(props: PlayModeViewProps) {
     audio.volume = 1;
   };
 
+  const clearRockPaperScissorsTimer = () => {
+    if (rockPaperScissorsTimeoutRef.current !== null) {
+      window.clearTimeout(rockPaperScissorsTimeoutRef.current);
+      rockPaperScissorsTimeoutRef.current = null;
+    }
+  };
+
   const resetActiveQuestionFlow = () => {
     genderRevealSequenceIdRef.current += 1;
+    rockPaperScissorsSequenceIdRef.current += 1;
     stopGenderRevealAudio();
+    clearRockPaperScissorsTimer();
     setActiveClue(null);
     setJokerRound(null);
     setGenderRevealRound(null);
     setGenderRevealBonusPointsForClue(0);
+    setRockPaperScissorsRound(null);
+    setRockPaperScissorsPointsDeltaForClue(0);
     setIsJokerResultHolding(false);
     setIsQuestionRevealTransitioning(false);
     setAnswerInput("");
@@ -352,10 +392,71 @@ export default function PlayModeView(props: PlayModeViewProps) {
         window.clearInterval(genderRevealFadeIntervalRef.current);
         genderRevealFadeIntervalRef.current = null;
       }
+      clearRockPaperScissorsTimer();
       audio.pause();
       genderRevealAudioRef.current = null;
     };
   }, []);
+
+  const handleRockPaperScissorsChoice = (choice: RockPaperScissorsChoice) => {
+    if (!rockPaperScissorsRound || rockPaperScissorsRound.status !== "choosing") {
+      return;
+    }
+
+    const sequenceId = rockPaperScissorsSequenceIdRef.current + 1;
+    rockPaperScissorsSequenceIdRef.current = sequenceId;
+    clearRockPaperScissorsTimer();
+
+    const computerChoice = getComputerRockPaperScissorsChoice(choice);
+    const result = evaluateRockPaperScissorsResult(choice, computerChoice);
+    const pointsDelta =
+      result === "win"
+        ? ROCK_PAPER_SCISSORS_BONUS_POINTS
+        : -ROCK_PAPER_SCISSORS_BONUS_POINTS;
+
+    setRockPaperScissorsRound({
+      status: "animating",
+      playerChoice: choice,
+      computerChoice: null,
+      result: null,
+      pointsDelta: 0,
+      chantStep: 0,
+    });
+
+    const runStep = (step: number) => {
+      rockPaperScissorsTimeoutRef.current = window.setTimeout(() => {
+        if (rockPaperScissorsSequenceIdRef.current !== sequenceId) {
+          return;
+        }
+
+        if (step < ROCK_PAPER_SCISSORS_CHANT_STEPS) {
+          setRockPaperScissorsRound((current) =>
+            current
+              ? {
+                  ...current,
+                  chantStep: step + 1,
+                }
+              : current,
+          );
+          runStep(step + 1);
+          return;
+        }
+
+        setRockPaperScissorsRound({
+          status: "revealed",
+          playerChoice: choice,
+          computerChoice,
+          result,
+          pointsDelta,
+          chantStep: ROCK_PAPER_SCISSORS_CHANT_STEPS,
+        });
+        setRockPaperScissorsPointsDeltaForClue(pointsDelta);
+        rockPaperScissorsTimeoutRef.current = null;
+      }, ROCK_PAPER_SCISSORS_CHANT_STEP_MS);
+    };
+
+    runStep(0);
+  };
 
   const resolvedPointValue = useMemo(() => {
     if (!activeClue) {
@@ -366,8 +467,18 @@ export default function PlayModeView(props: PlayModeViewProps) {
       !jokerRound || jokerRound.finalPoints === null
         ? activeClue.pointValue
         : jokerRound.finalPoints;
-    return baseValue + genderRevealBonusPointsForClue;
-  }, [activeClue, genderRevealBonusPointsForClue, jokerRound]);
+    return Math.max(
+      0,
+      baseValue +
+        genderRevealBonusPointsForClue +
+        rockPaperScissorsPointsDeltaForClue,
+    );
+  }, [
+    activeClue,
+    genderRevealBonusPointsForClue,
+    jokerRound,
+    rockPaperScissorsPointsDeltaForClue,
+  ]);
 
   if (game.categories.length === 0) {
     return (
@@ -424,9 +535,14 @@ export default function PlayModeView(props: PlayModeViewProps) {
                       genderRevealAssignedIdSet.has(clue.id);
                     const shouldTriggerJoker =
                       jokerConfig.enabled && jokerAssignedIdSet.has(clue.id);
+                    const shouldTriggerRockPaperScissors =
+                      rockPaperScissorsConfig.enabled &&
+                      rockPaperScissorsAssignedIdSet.has(clue.id);
                     setActiveClue(clue);
                     setJokerRound(
-                      shouldTriggerJoker && !shouldTriggerGenderReveal
+                      shouldTriggerJoker &&
+                        !shouldTriggerGenderReveal &&
+                        !shouldTriggerRockPaperScissors
                         ? createJokerRound(clue.pointValue, {
                             jokerSpotCount: jokerConfig.jokerSpotCount,
                             thiefSpotCount: jokerConfig.thiefSpotCount,
@@ -438,8 +554,15 @@ export default function PlayModeView(props: PlayModeViewProps) {
                         ? createGenderRevealRound()
                         : null,
                     );
+                    setRockPaperScissorsRound(
+                      shouldTriggerRockPaperScissors
+                        ? createRockPaperScissorsRound()
+                        : null,
+                    );
                     setGenderRevealBonusPointsForClue(0);
+                    setRockPaperScissorsPointsDeltaForClue(0);
                     stopGenderRevealAudio();
+                    clearRockPaperScissorsTimer();
                     setIsJokerResultHolding(false);
                     setIsQuestionRevealTransitioning(false);
                     setAnswerInput("");
@@ -575,6 +698,132 @@ export default function PlayModeView(props: PlayModeViewProps) {
                     ))}
                   </div>
                 </>
+              )}
+          </div>
+        </MiniGameModal>
+      )}
+
+      {activeClue && rockPaperScissorsRound && (
+        <MiniGameModal
+          title={t("components.playModeView.rockPaperScissorsTitle")}
+          subtitle={t("components.playModeView.rockPaperScissorsSubtitle", {
+            teamName: currentTeam?.name ?? "",
+          })}
+          closeLabel={
+            rockPaperScissorsRound.status === "revealed"
+              ? t("components.playModeView.close")
+              : t("components.playModeView.cancel")
+          }
+          onClose={() => {
+            resetActiveQuestionFlow();
+          }}
+        >
+          <div className={`rps-stage ${rockPaperScissorsRound.status}`}>
+            <div className="rps-choices" aria-label={t("components.playModeView.rpsChoiceAria")}>
+              {getRockPaperScissorsChoices(t).map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={`rps-choice-card ${rockPaperScissorsRound.playerChoice === option.value ? "selected" : ""}`}
+                  disabled={rockPaperScissorsRound.status !== "choosing" || isBusy}
+                  onClick={() => handleRockPaperScissorsChoice(option.value)}
+                >
+                  <span className="rps-choice-icon" aria-hidden="true">
+                    {option.icon}
+                  </span>
+                  <span className="rps-choice-label">{option.label}</span>
+                </button>
+              ))}
+            </div>
+
+            {rockPaperScissorsRound.status !== "choosing" && (
+              <div className="rps-chant-strip" aria-live="polite">
+                {getRockPaperScissorsChantLabel(rockPaperScissorsRound, t)}
+              </div>
+            )}
+
+            {rockPaperScissorsRound.status === "revealed" &&
+              rockPaperScissorsRound.playerChoice &&
+              rockPaperScissorsRound.computerChoice &&
+              rockPaperScissorsRound.result && (
+                <div className="rps-result-panel">
+                  <div className="rps-result-grid">
+                    <div className="rps-result-card player">
+                      <span className="rps-result-caption">
+                        {t("components.playModeView.rpsYou")}
+                      </span>
+                      <span className="rps-result-icon" aria-hidden="true">
+                        {
+                          getRockPaperScissorsChoiceMeta(
+                            rockPaperScissorsRound.playerChoice,
+                            t,
+                          ).icon
+                        }
+                      </span>
+                      <span className="rps-result-label">
+                        {
+                          getRockPaperScissorsChoiceMeta(
+                            rockPaperScissorsRound.playerChoice,
+                            t,
+                          ).label
+                        }
+                      </span>
+                    </div>
+
+                    <div className="rps-result-versus" aria-hidden="true">
+                      VS
+                    </div>
+
+                    <div className="rps-result-card computer">
+                      <span className="rps-result-caption">
+                        {t("components.playModeView.rpsComputer")}
+                      </span>
+                      <span className="rps-result-icon" aria-hidden="true">
+                        {
+                          getRockPaperScissorsChoiceMeta(
+                            rockPaperScissorsRound.computerChoice,
+                            t,
+                          ).icon
+                        }
+                      </span>
+                      <span className="rps-result-label">
+                        {
+                          getRockPaperScissorsChoiceMeta(
+                            rockPaperScissorsRound.computerChoice,
+                            t,
+                          ).label
+                        }
+                      </span>
+                    </div>
+                  </div>
+
+                  <p
+                    className={`rps-result-banner ${rockPaperScissorsRound.result}`}
+                  >
+                    {rockPaperScissorsRound.result === "win"
+                      ? t("components.playModeView.rpsWinMessage", {
+                          points: ROCK_PAPER_SCISSORS_BONUS_POINTS,
+                        })
+                      : t("components.playModeView.rpsLoseMessage", {
+                          points: ROCK_PAPER_SCISSORS_BONUS_POINTS,
+                        })}
+                  </p>
+
+                  <button
+                    type="button"
+                    className={
+                      rockPaperScissorsRound.result === "win"
+                        ? "btn-success"
+                        : "btn-warning"
+                    }
+                    onClick={() => {
+                      clearRockPaperScissorsTimer();
+                      setRockPaperScissorsRound(null);
+                    }}
+                  >
+                    {t("common.continue")}
+                  </button>
+                </div>
               )}
           </div>
         </MiniGameModal>
@@ -721,6 +970,7 @@ export default function PlayModeView(props: PlayModeViewProps) {
 
       {activeClue &&
         !genderRevealIsActive &&
+        !rockPaperScissorsIsActive &&
         !jokerIsActive &&
         !isQuestionRevealTransitioning && (
           <div className="modal-backdrop">
@@ -738,6 +988,19 @@ export default function PlayModeView(props: PlayModeViewProps) {
                   ? ` ${t("components.playModeView.includesRevealBonus", { points: genderRevealBonusPointsForClue })}`
                   : ""}
               </h3>
+              {rockPaperScissorsPointsDeltaForClue !== 0 && (
+                <p
+                  className={`message ${rockPaperScissorsPointsDeltaForClue > 0 ? "success" : "error"}`}
+                >
+                  {rockPaperScissorsPointsDeltaForClue > 0
+                    ? t("components.playModeView.rpsQuestionWinResult", {
+                        points: ROCK_PAPER_SCISSORS_BONUS_POINTS,
+                      })
+                    : t("components.playModeView.rpsQuestionLoseResult", {
+                        points: ROCK_PAPER_SCISSORS_BONUS_POINTS,
+                      })}
+                </p>
+              )}
               {jokerRound?.status === "completed" && (
                 <p
                   className={`message ${jokerRound.thiefHit ? "error" : "success"}`}
@@ -881,6 +1144,86 @@ export default function PlayModeView(props: PlayModeViewProps) {
       )}
     </Box>
   );
+}
+
+function createRockPaperScissorsRound(): RockPaperScissorsRoundState {
+  return {
+    status: "choosing",
+    playerChoice: null,
+    computerChoice: null,
+    result: null,
+    pointsDelta: 0,
+    chantStep: 0,
+  };
+}
+
+function getRockPaperScissorsChoices(t: TFunction) {
+  return [
+    {
+      value: "rock" as const,
+      icon: "✊",
+      label: t("components.playModeView.rpsRock"),
+    },
+    {
+      value: "paper" as const,
+      icon: "📄",
+      label: t("components.playModeView.rpsPaper"),
+    },
+    {
+      value: "scissors" as const,
+      icon: "✂️",
+      label: t("components.playModeView.rpsScissors"),
+    },
+  ];
+}
+
+function getRockPaperScissorsChoiceMeta(
+  choice: RockPaperScissorsChoice,
+  t: TFunction,
+) {
+  return getRockPaperScissorsChoices(t).find((option) => option.value === choice)!;
+}
+
+function getRockPaperScissorsChantLabel(
+  round: RockPaperScissorsRoundState,
+  t: TFunction,
+): string {
+  const chant = [
+    t("components.playModeView.rpsRock"),
+    t("components.playModeView.rpsPaper"),
+    t("components.playModeView.rpsScissorsBang"),
+  ];
+
+  if (round.status === "revealed") {
+    return t("components.playModeView.rpsRevealReady");
+  }
+
+  return chant[Math.max(0, round.chantStep - 1)] ?? t("components.playModeView.rpsReady");
+}
+
+function getComputerRockPaperScissorsChoice(
+  playerChoice: RockPaperScissorsChoice,
+): RockPaperScissorsChoice {
+  const remainingChoices = ["rock", "paper", "scissors"].filter(
+    (choice) => choice !== playerChoice,
+  ) as RockPaperScissorsChoice[];
+  const randomIndex = Math.floor(Math.random() * remainingChoices.length);
+  return remainingChoices[randomIndex];
+}
+
+function evaluateRockPaperScissorsResult(
+  playerChoice: RockPaperScissorsChoice,
+  computerChoice: RockPaperScissorsChoice,
+): "win" | "lose" {
+  if (
+    (playerChoice === "rock" && computerChoice === "scissors") ||
+    (playerChoice === "paper" && computerChoice === "rock") ||
+    (playerChoice === "scissors" && computerChoice === "paper")
+  ) {
+    return "win";
+  }
+
+  return "lose";
 }
 
 function normalize(value: string): string {
